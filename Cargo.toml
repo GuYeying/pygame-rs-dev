@@ -27,65 +27,9 @@ rustpython-vm = { path = "../pygame-rs/src/rpy/dependencies/RustPython-main/crat
 rustpython-pylib = { path = "../pygame-rs/src/rpy/dependencies/RustPython-main/crates/pylib", features = ["freeze-stdlib"] }
 rustpython-derive = { path = "../pygame-rs/src/rpy/dependencies/RustPython-main/crates/derive" }
 
-# ── APK 壳（自 pygame-rs 迁入，2026-10-26 定约）：逐模块测试案例的
-# 真机形态——桌面 = python.exe examples/<名>.py 直跑；真机 = cargo ndk
-# + scripts/build_apk.py --dir .（android/AndroidManifest.xml 模板已随迁）。
-# 同名 .rs 即壳本体（include_str! 同目录 .py）──
-[[example]]
-name = "draw_test_android"
-path = "examples/draw_test.rs"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "font_test_android"
-path = "examples/font_test.rs"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "transparent_test_android"
-path = "examples/transparent_test.rs"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "blit_transform_demo_android"
-path = "examples/blit_transform_demo.rs"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "custom_pipeline_demo_android"
-path = "examples/custom_pipeline_demo.rs"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "rapier_test_android"
-path = "examples/rapier_test.rs"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "rapier3d_test_android"
-path = "examples/rapier3d_test.rs"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "pip_test_android"
-path = "examples/pip_test.rs"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "parity_test_android"
-path = "examples/parity_test.rs"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "egui_test_android"
-path = "examples/egui_test.rs"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "surf_probe_android"
-path = "examples/surf_probe.rs"
-crate-type = ["cdylib"]
-
+# examples = 纯 Python 脚本（python.exe examples/<名>.py 直跑）——
+# APK 壳（*_android.rs cdylib）2026-10-26 退役：真机链待通用 runner
+# 接管；模板 android/ 目录随之移除（需要时从 pygame-rs 历史取回）
 
 [profile.release]
 strip = true
