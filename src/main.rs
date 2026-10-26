@@ -83,6 +83,13 @@ async fn run_file(path: &str, args: Vec<String>, t0: Instant) {
     let interp = rpy::new_interpreter();
     println!("[pygame-rs-dev] ①解释器就绪 {}ms", t_rp.elapsed().as_millis());
     interp.enter(|vm| set_argv(vm, path, &args)); // python 标准 sys.argv
+    // 游戏脚本模块加载（python 行为：模块解析相对 main 所在目录——
+    // 本壳已切 cwd；约定目录 modules/，缺失则零注入、纯脚本零开销）
+    interp.enter(|vm| match rpy::install_module_finder(vm, "modules") {
+        Ok(0) => {}
+        Ok(n) => println!("[pygame-rs-dev] 模块目录装载 {n} 个（modules/）"),
+        Err(e) => eprintln!("[pygame-rs-dev] 模块装载失败: {e}"),
+    });
     let t_font = Instant::now();
     rpy::testhost::preload_cjk("pygame-rs-dev").await;
     println!("[pygame-rs-dev] ②字体预载完 {}ms", t_font.elapsed().as_millis());
