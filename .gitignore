@@ -1,0 +1,5 @@
+target/
+*.log
+*.png
+script_test/
+*.exe

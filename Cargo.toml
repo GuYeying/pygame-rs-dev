@@ -1,0 +1,32 @@
+[package]
+name = "pygame-rs-dev"
+version = "0.1.1"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "pygame-rs-dev —— pygame 的 python（开发解释器）：pygame 全内置、零 Rust 工具链"
+
+[[bin]]
+# 产物名 = python（用户定夺：开发解释器的分发形态就是 python.exe——
+# pygame 全内置的 python 发行版；项目/仓库名 = pgpython）
+name = "python"
+path = "src/main.rs"
+
+[dependencies]
+# 核心库（绑定面 + 宿主）：pygame 全内置
+pygame-rs = { path = "../pygame-rs", features = ["gui", "physics2d", "physics3d"] }
+# 事件泵/混音器驱动（脚本直跑的游戏门帧循环用）
+starfish-pygame = { path = "../starfish/crates/starfish-pygame" }
+# 开发辅助（app_entry! 跨平台入口宏）
+starfish-std = { path = "../starfish/crates/starfish-std" }
+
+# RustPython 三件套（path 指向 pygame-rs 的 vendored——与 pygame-rs
+# 同源同版本合并单实例；features 必须与 pygame-rs 完全一致）
+rustpython-vm = { path = "../pygame-rs/src/rpy/dependencies/RustPython-main/crates/vm", default-features = false, features = [
+    "compiler", "wasmbind", "gc", "stdio", "importlib", "encodings", "freeze-stdlib",
+] }
+rustpython-pylib = { path = "../pygame-rs/src/rpy/dependencies/RustPython-main/crates/pylib", features = ["freeze-stdlib"] }
+rustpython-derive = { path = "../pygame-rs/src/rpy/dependencies/RustPython-main/crates/derive" }
+
+
+[profile.release]
+strip = true

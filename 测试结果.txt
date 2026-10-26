@@ -1,0 +1,366 @@
+(base) PS D:\Projects\Rust\pypg\script_test> .\pypg binding_probe.py
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+['Color', 'Surface', '__doc__', '__loader__', '__name__', '__package__', '__spec__', 'dialog', 'display', 'event', 'font', 'gamepad', 'gfxdraw', 'image', 'init', 'io', 'key', 'mask', 'math', 'mixer', 'mouse', 'net', 'permission', 'quit', 'render', 'sndarray', 'sprite', 'targets', 'time', 'touch', 'transform', 'version', 'video']
+['Mask', '__doc__', '__loader__', '__name__', '__package__', '__spec__', 'from_surface']
+['Event', 'KEYDOWN', 'KEYUP', 'Key', 'MOUSEBUTTONDOWN', 'MOUSEBUTTONUP', 'MOUSEMOTION', 'QUIT', 'TEXTINPUT', '__doc__', '__loader__', '__name__', '__package__', '__spec__', 'clear', 'get', 'poll']
+[pygame] display.set_mode 需求 (800, 600)（真身由宿主壳装配）
+[pygame] display.set_mode 需求 (800, 600)（真身由宿主壳装配）
+[diag] 提示音已循环播放 len = 1.907006859779358
+
+thread 'main' (32128) panicked at D:\Projects\Rust\starfish\crates\starfish-pygame\src\render\mod.rs:186:41:
+pygame 渲染未初始化：须先建立 GPU 槽（P2 = Screen::new；P3 = display.set_mode）
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'main' (32128) panicked at D:\Rust\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib/rustlib/src/rust\library\std\src\thread\lifecycle.rs:226:14:
+threads should not terminate unexpectedly
+
+thread 'main' (32128) panicked at D:\Rust\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib/rustlib/src/rust\library\std\src\thread\local.rs:428:25:
+cannot access a Thread Local Storage value during or after destruction: AccessError
+stack backtrace:
+   0:     0x7ff76d980cfe - <unknown>
+   1:     0x7ff76d996801 - <unknown>
+   2:     0x7ff76d986fa4 - <unknown>
+   3:     0x7ff76d968d89 - <unknown>
+   4:     0x7ff76d979508 - <unknown>
+   5:     0x7ff76d9797c3 - <unknown>
+   6:     0x7ff76d968e5e - <unknown>
+   7:     0x7ff76d966cff - <unknown>
+   8:     0x7ff76d9695ce - <unknown>
+   9:     0x7ff76dac947d - <unknown>
+  10:     0x7ff76dac8280 - <unknown>
+  11:     0x7ff76c222d83 - <unknown>
+  12:     0x7ff76c1a0361 - <unknown>
+  13:     0x7ff76c1a0efc - <unknown>
+  14:     0x7ffd4615bb00 - _CxxFrameHandler3
+  15:     0x7ffd46143a9d - is_exception_typeof
+  16:     0x7ffd4615ae8d - _C_specific_handler
+  17:     0x7ffd46142ce2 - is_exception_typeof
+  18:     0x7ffd4615b8f8 - _CxxFrameHandler3
+  19:     0x7ffd4c5e652f - _chkstk
+  20:     0x7ffd4c49dd30 - RtlUnwindEx
+  21:     0x7ffd4c5a4bd6 - _C_specific_handler
+  22:     0x7ffd4c5e64af - _chkstk
+  23:     0x7ffd4c544065 - RtlWow64GetCurrentMachine
+  24:     0x7ffd4c499f3d - RtlRaiseException
+  25:     0x7ffd49c8408a - RaiseException
+  26:     0x7ffd461455a9 - CxxThrowException
+  27:     0x7ff76d98718d - <unknown>
+  28:     0x7ff76d987065 - <unknown>
+  29:     0x7ff76d9692df - <unknown>
+  30:     0x7ff76d97983e - <unknown>
+  31:     0x7ff76d968e5e - <unknown>
+  32:     0x7ff76d966cff - <unknown>
+  33:     0x7ff76d9695ce - <unknown>
+  34:     0x7ff76dac947d - <unknown>
+  35:     0x7ff76dac91c5 - <unknown>
+  36:     0x7ff76c229c47 - <unknown>
+  37:     0x7ff76c223186 - <unknown>
+  38:     0x7ff76c1a0dfc - <unknown>
+  39:     0x7ff76bc9bd9c - <unknown>
+  40:     0x7ff76d97e6a1 - <unknown>
+  41:     0x7ffd4c565c7b - RtlTimeToSecondsSince1970
+  42:     0x7ffd4c59ef6a - RtlWow64SuspendThread
+  43:     0x7ffd4c49b2e3 - RtlRaiseException
+  44:     0x7ffd4c49b69b - RtlRaiseException
+  45:     0x7ffd4c5003d1 - LdrShutdownProcess
+  46:     0x7ffd4c4fef8e - RtlExitUserProcess
+  47:     0x7ffd4aa117ab - ExitProcess
+  48:     0x7ffd498d0813 - logbf
+  49:     0x7ff76d9a2186 - <unknown>
+  50:     0x7ffd4a9fdda7 - BaseThreadInitThunk
+  51:     0x7ffd4c4fee4c - RtlUserThreadStart
+(base) PS D:\Projects\Rust\pypg\script_test> .\pypg blit_transform_demo.py
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pygame] display.set_mode 需求 (800, 600)（真身由宿主壳装配）
+[pygame] display.set_mode 需求 (800, 600)（真身由宿主壳装配）
+
+thread 'main' (40156) panicked at D:\Projects\Rust\starfish\crates\starfish-pygame\src\render\mod.rs:186:41:
+pygame 渲染未初始化：须先建立 GPU 槽（P2 = Screen::new；P3 = display.set_mode）
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+(base) PS D:\Projects\Rust\pypg\script_test> .\pypg custom_pipeline_demo.py
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pygame] display.set_mode 需求 (800, 600)（真身由宿主壳装配）
+[pygame] display.set_mode 需求 (800, 600)（真身由宿主壳装配）
+
+thread 'main' (15568) panicked at D:\Projects\Rust\starfish\crates\starfish-pygame\src\render\mod.rs:186:41:
+pygame 渲染未初始化：须先建立 GPU 槽（P2 = Screen::new；P3 = display.set_mode）
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+(base) PS D:\Projects\Rust\pypg\script_test> .\pypg draw_test.py
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pygame] display.set_mode 需求 (800, 600)（真身由宿主壳装配）
+[pygame] display.set_mode 需求 (800, 600)（真身由宿主壳装配）
+
+thread 'main' (29916) panicked at D:\Projects\Rust\starfish\crates\starfish-pygame\src\render\mod.rs:186:41:
+pygame 渲染未初始化：须先建立 GPU 槽（P2 = Screen::new；P3 = display.set_mode）
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+(base) PS D:\Projects\Rust\pypg\script_test> .\pypg egui_test.py
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pygame] display.set_mode 需求 (800, 600)（真身由宿主壳装配）
+[pygame] display.set_mode 需求 (800, 600)（真身由宿主壳装配）
+[egui-test] FAIL egui.init
+    [egui-test] 异常: pygame.egui.init() 须在 pygame.display.set_mode 之后调用
+[egui-test] FAIL egui.init 幂等
+    [egui-test] 异常: pygame.egui.init() 须在 pygame.display.set_mode 之后调用
+[egui-test] PASS wants_pointer 初值布尔
+
+thread 'main' (16088) panicked at D:\Projects\Rust\starfish\crates\starfish-pygame\src\render\mod.rs:186:41:
+pygame 渲染未初始化：须先建立 GPU 槽（P2 = Screen::new；P3 = display.set_mode）
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+(base) PS D:\Projects\Rust\pypg\script_test> .\pypg font_test.py
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pygame] display.set_mode 需求 (1000, 700)（真身由宿主壳装配）
+[pygame] display.set_mode 需求 (1000, 700)（真身由宿主壳装配）
+[font-test] PASS Font(None, 24) 构造
+[font-test] PASS Font.size 正宽
+[font-test] PASS Font.size 高 = line_height
+[font-test] PASS Font.size 空串 (0, line_height)
+[font-test] PASS Font 缺 size TypeError
+[font-test] PASS Font 坏字节 ValueError
+[font-test] PASS SysFont shim（路由内嵌默认字体）
+[font-test] PASS Font("cjk") 构造
+[font-test] PASS Font(路径) C:/Windows/Fonts/arial.ttf
+
+thread 'main' (32248) panicked at D:\Projects\Rust\starfish\crates\starfish-pygame\src\render\mod.rs:186:41:
+pygame 渲染未初始化：须先建立 GPU 槽（P2 = Screen::new；P3 = display.set_mode）
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+(base) PS D:\Projects\Rust\pypg\script_test> .\pypg parity_test.py
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pygame] display.set_mode 需求 (800, 600)（真身由宿主壳装配）
+[pygame] display.set_mode 需求 (800, 600)（真身由宿主壳装配）
+[parity-test] PASS color.named
+[parity-test] PASS color.update
+[parity-test] PASS color.cmy 域
+[parity-test] PASS color.hsva 域
+[parity-test] PASS color.hsla 域
+[parity-test] PASS color.i1i2i3 域
+[parity-test] PASS color.contains
+[parity-test] PASS color.set_length
+[parity-test] PASS mixer.Channel 构造
+[parity-test] PASS mixer.num_channels
+[parity-test] PASS mixer.output_sample_rate
+[parity-test] PASS mixer.Effect.set
+[parity-test] PASS mixer.Channel.add_effect
+[parity-test] PASS mixer.Channel.play/get_busy
+[parity-test] PASS mixer.Channel.fade_out
+
+thread 'main' (42940) panicked at D:\Projects\Rust\starfish\crates\starfish-pygame\src\render\mod.rs:186:41:
+pygame 渲染未初始化：须先建立 GPU 槽（P2 = Screen::new；P3 = display.set_mode）
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'main' (42940) panicked at D:\Rust\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib/rustlib/src/rust\library\std\src\thread\lifecycle.rs:226:14:
+threads should not terminate unexpectedly
+
+thread 'main' (42940) panicked at D:\Rust\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib/rustlib/src/rust\library\std\src\thread\local.rs:428:25:
+cannot access a Thread Local Storage value during or after destruction: AccessError
+stack backtrace:
+   0:     0x7ff76d980cfe - <unknown>
+   1:     0x7ff76d996801 - <unknown>
+   2:     0x7ff76d986fa4 - <unknown>
+   3:     0x7ff76d968d89 - <unknown>
+   4:     0x7ff76d979508 - <unknown>
+   5:     0x7ff76d9797c3 - <unknown>
+   6:     0x7ff76d968e5e - <unknown>
+   7:     0x7ff76d966cff - <unknown>
+   8:     0x7ff76d9695ce - <unknown>
+   9:     0x7ff76dac947d - <unknown>
+  10:     0x7ff76dac8280 - <unknown>
+  11:     0x7ff76c222d83 - <unknown>
+  12:     0x7ff76c1a0361 - <unknown>
+  13:     0x7ff76c1a0efc - <unknown>
+  14:     0x7ffd4615bb00 - _CxxFrameHandler3
+  15:     0x7ffd46143a9d - is_exception_typeof
+  16:     0x7ffd4615ae8d - _C_specific_handler
+  17:     0x7ffd46142ce2 - is_exception_typeof
+  18:     0x7ffd4615b8f8 - _CxxFrameHandler3
+  19:     0x7ffd4c5e652f - _chkstk
+  20:     0x7ffd4c49dd30 - RtlUnwindEx
+  21:     0x7ffd4c5a4bd6 - _C_specific_handler
+  22:     0x7ffd4c5e64af - _chkstk
+  23:     0x7ffd4c544065 - RtlWow64GetCurrentMachine
+  24:     0x7ffd4c499f3d - RtlRaiseException
+  25:     0x7ffd49c8408a - RaiseException
+  26:     0x7ffd461455a9 - CxxThrowException
+  27:     0x7ff76d98718d - <unknown>
+  28:     0x7ff76d987065 - <unknown>
+  29:     0x7ff76d9692df - <unknown>
+  30:     0x7ff76d97983e - <unknown>
+  31:     0x7ff76d968e5e - <unknown>
+  32:     0x7ff76d966cff - <unknown>
+  33:     0x7ff76d9695ce - <unknown>
+  34:     0x7ff76dac947d - <unknown>
+  35:     0x7ff76dac91c5 - <unknown>
+  36:     0x7ff76c229c47 - <unknown>
+  37:     0x7ff76c223186 - <unknown>
+  38:     0x7ff76c1a0dfc - <unknown>
+  39:     0x7ff76bc95893 - <unknown>
+  40:     0x7ff76bfd391f - <unknown>
+  41:     0x7ff76d97e6a1 - <unknown>
+  42:     0x7ffd4c565c7b - RtlTimeToSecondsSince1970
+  43:     0x7ffd4c59ef6a - RtlWow64SuspendThread
+  44:     0x7ffd4c49b2e3 - RtlRaiseException
+  45:     0x7ffd4c49b69b - RtlRaiseException
+  46:     0x7ffd4c5003d1 - LdrShutdownProcess
+  47:     0x7ffd4c4fef8e - RtlExitUserProcess
+  48:     0x7ffd4aa117ab - ExitProcess
+  49:     0x7ffd498d0813 - logbf
+  50:     0x7ff76d9a2186 - <unknown>
+  51:     0x7ffd4a9fdda7 - BaseThreadInitThunk
+  52:     0x7ffd4c4fee4c - RtlUserThreadStart
+(base) PS D:\Projects\Rust\pypg\script_test> ^C
+(base) PS D:\Projects\Rust\pypg\script_test> .\pypg parity_test.py
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pygame] display.set_mode 需求 (800, 600)（真身由宿主壳装配）
+[pygame] display.set_mode 需求 (800, 600)（真身由宿主壳装配）
+[parity-test] PASS color.named
+[parity-test] PASS color.update
+[parity-test] PASS color.cmy 域
+[parity-test] PASS color.hsva 域
+[parity-test] PASS color.hsla 域
+[parity-test] PASS color.i1i2i3 域
+[parity-test] PASS color.contains
+[parity-test] PASS color.set_length
+[parity-test] PASS mixer.Channel 构造
+[parity-test] PASS mixer.num_channels
+[parity-test] PASS mixer.output_sample_rate
+[parity-test] PASS mixer.Effect.set
+[parity-test] PASS mixer.Channel.add_effect
+[parity-test] PASS mixer.Channel.play/get_busy
+[parity-test] PASS mixer.Channel.fade_out
+
+thread 'main' (22376) panicked at D:\Projects\Rust\starfish\crates\starfish-pygame\src\render\mod.rs:186:41:
+pygame 渲染未初始化：须先建立 GPU 槽（P2 = Screen::new；P3 = display.set_mode）
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'main' (22376) panicked at D:\Rust\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib/rustlib/src/rust\library\std\src\thread\lifecycle.rs:226:14:
+threads should not terminate unexpectedly
+
+thread 'main' (22376) panicked at D:\Rust\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib/rustlib/src/rust\library\std\src\thread\local.rs:428:25:
+cannot access a Thread Local Storage value during or after destruction: AccessError
+stack backtrace:
+   0:     0x7ff76d980cfe - <unknown>
+   1:     0x7ff76d996801 - <unknown>
+   2:     0x7ff76d986fa4 - <unknown>
+   3:     0x7ff76d968d89 - <unknown>
+   4:     0x7ff76d979508 - <unknown>
+   5:     0x7ff76d9797c3 - <unknown>
+   6:     0x7ff76d968e5e - <unknown>
+   7:     0x7ff76d966cff - <unknown>
+   8:     0x7ff76d9695ce - <unknown>
+   9:     0x7ff76dac947d - <unknown>
+  10:     0x7ff76dac8280 - <unknown>
+  11:     0x7ff76c222d83 - <unknown>
+  12:     0x7ff76c1a0361 - <unknown>
+  13:     0x7ff76c1a0efc - <unknown>
+  14:     0x7ffd4615bb00 - _CxxFrameHandler3
+  15:     0x7ffd46143a9d - is_exception_typeof
+  16:     0x7ffd4615ae8d - _C_specific_handler
+  17:     0x7ffd46142ce2 - is_exception_typeof
+  18:     0x7ffd4615b8f8 - _CxxFrameHandler3
+  19:     0x7ffd4c5e652f - _chkstk
+  20:     0x7ffd4c49dd30 - RtlUnwindEx
+  21:     0x7ffd4c5a4bd6 - _C_specific_handler
+  22:     0x7ffd4c5e64af - _chkstk
+  23:     0x7ffd4c544065 - RtlWow64GetCurrentMachine
+  24:     0x7ffd4c499f3d - RtlRaiseException
+  25:     0x7ffd49c8408a - RaiseException
+  26:     0x7ffd461455a9 - CxxThrowException
+  27:     0x7ff76d98718d - <unknown>
+  28:     0x7ff76d987065 - <unknown>
+  29:     0x7ff76d9692df - <unknown>
+  30:     0x7ff76d97983e - <unknown>
+  31:     0x7ff76d968e5e - <unknown>
+  32:     0x7ff76d966cff - <unknown>
+  33:     0x7ff76d9695ce - <unknown>
+  34:     0x7ff76dac947d - <unknown>
+  35:     0x7ff76dac91c5 - <unknown>
+  36:     0x7ff76c229c47 - <unknown>
+  37:     0x7ff76c223186 - <unknown>
+  38:     0x7ff76c1a0dfc - <unknown>
+  39:     0x7ff76bc95893 - <unknown>
+  40:     0x7ff76bfd391f - <unknown>
+  41:     0x7ff76d97e6a1 - <unknown>
+  42:     0x7ffd4c565c7b - RtlTimeToSecondsSince1970
+  43:     0x7ffd4c59ef6a - RtlWow64SuspendThread
+  44:     0x7ffd4c49b2e3 - RtlRaiseException
+  45:     0x7ffd4c49b69b - RtlRaiseException
+  46:     0x7ffd4c5003d1 - LdrShutdownProcess
+  47:     0x7ffd4c4fef8e - RtlExitUserProcess
+  48:     0x7ffd4aa117ab - ExitProcess
+  49:     0x7ffd498d0813 - logbf
+  50:     0x7ff76d9a2186 - <unknown>
+  51:     0x7ffd4a9fdda7 - BaseThreadInitThunk
+  52:     0x7ffd4c4fee4c - RtlUserThreadStart
+(base) PS D:\Projects\Rust\pypg\script_test> .\pypg
+pypg REPL（pygame 全内置；quit() 退出）
+>>> exit()
+(base) PS D:\Projects\Rust\pypg\script_test> .\pypg rapier_test.py
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pygame] display.set_mode 需求 (800, 600)（真身由宿主壳装配）
+[pygame] display.set_mode 需求 (800, 600)（真身由宿主壳装配）
+[rapier-test] PASS PhysicsWorld 构造
+[rapier-test] PASS insert 返回句柄对
+[rapier-test] PASS translation 查询初值
+[rapier-test] PASS rotation 查询初值
+[rapier-test] PASS builder 二次消费报 ValueError
+[rapier-test] PASS 无效 handle 报 ValueError
+[rapier-test] PASS set_translation 瞬移
+[rapier-test] PASS set_linvel 读回
+[rapier-test] PASS set_rotation 读回
+[rapier-test] PASS apply_impulse 生效（有横速）
+[rapier-test] PASS remove_body 移除
+[rapier-test] PASS 移除后查询报错
+[rapier-test] PASS 触发区 collider 句柄
+
+thread 'main' (12740) panicked at D:\Projects\Rust\starfish\crates\starfish-pygame\src\render\mod.rs:186:41:
+pygame 渲染未初始化：须先建立 GPU 槽（P2 = Screen::new；P3 = display.set_mode）
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+(base) PS D:\Projects\Rust\pypg\script_test> .\pypg rapier3d_test.py
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pygame] display.set_mode 需求 (800, 600)（真身由宿主壳装配）
+[pygame] display.set_mode 需求 (800, 600)（真身由宿主壳装配）
+[pypg] 脚本异常:
+Traceback (most recent call last):
+  File "rapier3d_test.py", line 30, in main
+AttributeError: module 'pygame_physics' has no attribute 'PhysicsWorld3D'. Did you mean: 'PhysicsWorld'?
+(base) PS D:\Projects\Rust\pypg\script_test> .\pypg transparent_test.py
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（系统 msyh.ttc）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pypg] CJK 字体已预载（fonts/cjk.ttf）
+[pygame] display.set_mode 需求 (800, 600)（真身由宿主壳装配）
+[pygame] display.set_mode 需求 (800, 600)（真身由宿主壳装配）
+
+thread 'main' (15744) panicked at D:\Projects\Rust\starfish\crates\starfish-pygame\src\render\mod.rs:186:41:
+pygame 渲染未初始化：须先建立 GPU 槽（P2 = Screen::new；P3 = display.set_mode）
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+(base) PS D:\Projects\Rust\pypg\script_test>
