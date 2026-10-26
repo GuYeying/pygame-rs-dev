@@ -16,9 +16,9 @@ mod host;
 mod platform;
 mod runtime;
 
+/// 桌面入口（block_on + 退出码语义；REPL 直入）
+#[cfg(not(target_arch = "wasm32"))]
 fn main() {
-    // 直接调 block_on（桌面；wasm/android 宿主走 app_entry! 形态——
-    // 后续批次随平台 Host 一并落地）
     starfish_std::app::block_on(async move {
         let host = platform::desktop::DesktopHost::from_env();
         if host.wants_repl() {
@@ -30,3 +30,8 @@ fn main() {
         }
     });
 }
+
+/// wasm bin 的 rustc 存根——真入口 = platform::web::web_start
+///（`#[wasm_bindgen(start)]`，platform/web.rs）
+#[cfg(target_arch = "wasm32")]
+fn main() {}

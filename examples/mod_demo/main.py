@@ -16,7 +16,7 @@ async def main():
     print("[mod-demo] PASS 实例化 =", obj.greet())
     font = pygame.font.Font(None, 26)
     frames = 0
-    while frames < 90:
+    while frames < 600:
         with screen.render() as r:
             r.fill((24, 26, 38))
             r.blit(font.render(modules.utils.TITLE, True, (235, 235, 240)), (20, 20))

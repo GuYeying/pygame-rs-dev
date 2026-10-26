@@ -11,18 +11,24 @@
 use crate::host::{Host, RunRequest};
 use pygame_rs::rpy;
 use starfish_pygame::display;
-use std::time::Instant;
+use starfish_std::debug::{console_log, Stopwatch};
+
+/// 日志出口 = console_log 单路（桌面 stdout / wasm 控制台——runtime
+/// 对平台不可知，web 端 println 不可见故不走 println）
+fn log(msg: &str) {
+    console_log(msg);
+}
 
 /// 驱动一次运行，返回进程退出码（0 = 成功；2 = 载荷不可得；1 = 运行错误
 /// ——python 同语义）
 pub async fn run<H: Host>(host: &H) -> i32 {
     let name = host.name();
-    let t0 = Instant::now();
+    let t0 = Stopwatch::now();
     // ── 载荷获取（唯一平台差异点）──
     let req: RunRequest = match host.acquire().await {
         Ok(r) => r,
         Err(msg) => {
-            eprintln!("[{name}] {msg}");
+            log(&format!("[{name}] {msg}"));
             return 2;
         }
     };
@@ -33,9 +39,9 @@ pub async fn run<H: Host>(host: &H) -> i32 {
     }
     // ── 控制台阶段：建窗前完成全部确定性启动开销（各阶段打点——
     // 顺序与耗时可审计，"白窗等待"归因用）──
-    let t_rp = Instant::now();
+    let t_rp = Stopwatch::now();
     let interp = rpy::new_interpreter();
-    println!("[{name}] ①解释器就绪 {}ms", t_rp.elapsed().as_millis());
+    log(&format!("[{name}] ①解释器就绪 {}ms", t_rp.ms()));
     interp.enter(|vm| set_argv(vm, &req.name, &host.args())); // python 标准 sys.argv
     // 游戏脚本模块加载（python 行为：唯一解析根 = main 所在目录——
     // sys.path[0] 同语义）。modules/、resources/ 仅为打包便利文件夹，
@@ -44,13 +50,13 @@ pub async fn run<H: Host>(host: &H) -> i32 {
     if req.module_root.is_some() {
         interp.enter(|vm| match rpy::install_module_finder(vm, &["."]) {
             Ok(0) => {}
-            Ok(n) => println!("[{name}] 模块表装载 {n} 个（基准 = main 目录）"),
-            Err(e) => eprintln!("[{name}] 模块装载失败: {e}"),
+            Ok(n) => log(&format!("[{name}] 模块表装载 {n} 个（基准 = main 目录）")),
+            Err(e) => log(&format!("[{name}] 模块装载失败: {e}")),
         });
     }
-    let t_font = Instant::now();
+    let t_font = Stopwatch::now();
     rpy::testhost::preload_cjk(name).await;
-    println!("[{name}] ②字体预载完 {}ms", t_font.elapsed().as_millis());
+    log(&format!("[{name}] ②字体预载完 {}ms", t_font.ms()));
     // ── 创建期旗标预扫描（dev 解释器启发式）：TRANSPARENT 等创建期
     // 旗标只在建窗时生效（apply_window_request 的运行时面不覆盖；
     // 后端声明位同样"首次 set_mode 定终身"）——宿主壳预建窗须替脚本
@@ -71,19 +77,23 @@ pub async fn run<H: Host>(host: &H) -> i32 {
         }
     }
     // ── 建窗（可见；GPU/交换链装配承载于窗口期——百 ms 级）──
-    let t_gpu = Instant::now();
+    let t_gpu = Stopwatch::now();
     if let Err(e) = display::set_mode_ex((800, 600), host_flags).await {
-        eprintln!("[{name}] set_mode 失败: {e}");
+        log(&format!("[{name}] set_mode 失败: {e}"));
         return 1;
     }
-    println!(
+    log(&format!(
         "[{name}] ③建窗+GPU装配完 {}ms（创建期旗标 {host_flags:#b}）",
-        t_gpu.elapsed().as_millis()
-    );
-    println!("[{name}] ④执行 {}（累计 {}ms）", req.name, t0.elapsed().as_millis());
+        t_gpu.ms()
+    ));
+    log(&format!(
+        "[{name}] ④执行 {}（累计 {}ms）",
+        req.name,
+        t0.ms()
+    ));
     // 装配 + 执行统一走 testhost 面（帧桥注入/协程驱动/traceback 全在内）
     if let Err(e) = rpy::testhost::run_script_in(interp, &req.code, &req.name).await {
-        eprintln!("[{name}] {e}");
+        log(&format!("[{name}] {e}"));
         return 1;
     }
     0

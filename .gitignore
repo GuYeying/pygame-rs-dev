@@ -3,3 +3,4 @@ target/
 *.png
 script_test/
 *.exe
+web/

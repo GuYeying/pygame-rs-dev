@@ -4043,8 +4043,12 @@ dependencies = [
  "rustpython-derive",
  "rustpython-pylib",
  "rustpython-vm",
+ "starfish-io",
  "starfish-pygame",
  "starfish-std",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
