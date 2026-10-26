@@ -67,7 +67,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
 <p>【pygame-rs-dev】web 宿主（?script=&lt;路径&gt; 指定载荷，缺省 main.py）</p>
 <pre id="wlog" aria-label="console log"></pre>
 <div id="start-overlay">
-  <button id="start-btn">▶ 运行 main.py（?script= 可指定）</button>
+  <button id="start-btn">▶ 运行</button>
   <button id="pick-btn">或选择本地 .py 单文件运行（-c 形态）</button>
   <div id="hint">单文件脚本直跑（-c 形态；多模块工程桌面端开发调试）；
     进程一次契约：换游戏请刷新页面</div>
