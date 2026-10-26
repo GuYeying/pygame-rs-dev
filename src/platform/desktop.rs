@@ -8,7 +8,7 @@ use crate::host::RunRequest;
 use pygame_rs::rpy;
 use rustpython_vm::VirtualMachine;
 
-/// CLI 解析结果（python 标准命令行三形态）
+/// CLI 解析结果（python 标准命令行三形态 + serve 子命令）
 enum Mode {
     /// 无参 = 交互式 REPL（桌面专属交互，main 直入、不经 acquire）
     Repl,
@@ -16,6 +16,9 @@ enum Mode {
     Eval(String),
     /// `<脚本.py>`（余参透传 sys.argv）
     File(String),
+    /// `serve [目录] [端口]`：内置静态服务器（web 宿主页面的零依赖
+    /// 打开方式——file:// 下 ES module 被 CORS 拦截）
+    Serve { dir: String, port: u16 },
 }
 
 pub struct DesktopHost {
@@ -37,6 +40,14 @@ impl DesktopHost {
                     };
                     Self { mode: Mode::Eval(code), rest: argv.collect() }
                 }
+                "serve" => {
+                    let dir = argv.next().unwrap_or_else(|| "web".to_string());
+                    let port = argv
+                        .next()
+                        .and_then(|p| p.parse::<u16>().ok())
+                        .unwrap_or(8123);
+                    Self { mode: Mode::Serve { dir, port }, rest: Vec::new() }
+                }
                 path => Self { mode: Mode::File(path.to_string()), rest: argv.collect() },
             },
         }
@@ -45,6 +56,14 @@ impl DesktopHost {
     /// REPL 专属：无参调用 = 交互模式（main 据此直入 repl_mode）
     pub fn wants_repl(&self) -> bool {
         matches!(self.mode, Mode::Repl)
+    }
+
+    /// serve 专属：静态服务请求（main 据此进入内置服务器，不返回）
+    pub fn serve_request(&self) -> Option<(String, u16)> {
+        match &self.mode {
+            Mode::Serve { dir, port } => Some((dir.clone(), *port)),
+            _ => None,
+        }
     }
 }
 
@@ -60,6 +79,7 @@ impl crate::host::Host for DesktopHost {
     async fn acquire(&self) -> Result<RunRequest, String> {
         match &self.mode {
             Mode::Repl => unreachable!("REPL 由 main 直入 repl_mode，不经 acquire"),
+            Mode::Serve { .. } => unreachable!("serve 由 main 直入 serve::serve，不经 acquire"),
             Mode::Eval(code) => Ok(RunRequest {
                 name: "<pygame-rs-dev -c>".to_string(),
                 code: code.clone(),
@@ -198,7 +218,8 @@ fn usage() -> ! {
 用法（python 标准命令行）：\n\
   pygame-rs-dev                            交互式 REPL\n\
   pygame-rs-dev -c \"<代码>\"                单行直跑\n\
-  pygame-rs-dev <脚本.py> [参数...]         脚本直跑（async def main 协程自动驱动）\n\
+  pygame-rs-dev <脚本.py> [参数...]         脚本直跑（async def main 协程自动驱动）
+  pygame-rs-dev serve [目录] [端口]          内置静态服务器（web 宿主页面，缺省 web/:8123）\n\
 \n\
 pygame 全内置（import pygame 即用）；-c 不建窗，脚本形态预建渲染窗。"
     );

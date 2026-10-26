@@ -15,6 +15,7 @@
 mod host;
 mod platform;
 mod runtime;
+mod serve;
 
 /// 桌面入口（block_on + 退出码语义；REPL 直入）
 #[cfg(not(target_arch = "wasm32"))]
@@ -23,6 +24,9 @@ fn main() {
         let host = platform::desktop::DesktopHost::from_env();
         if host.wants_repl() {
             platform::desktop::repl_mode(); // 桌面专属交互形态（不返回）
+        }
+        if let Some((dir, port)) = host.serve_request() {
+            serve::serve(&dir, port); // 内置静态服务器（不返回）
         }
         let code = runtime::run(&host).await;
         if code != 0 {
