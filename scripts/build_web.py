@@ -30,47 +30,61 @@ LOCK = ROOT / "Cargo.lock"
 
 # 模板占位符 __BUILD_TS__ 由脚本替换（不用 str.format——JS/CSS 花括号免转义）
 INDEX_TEMPLATE = """<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <title>pygame-rs-dev · web 宿主</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #000;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center; }
-  canvas { outline: none; width: 800px; height: 600px; }
-  p { color: #888; font: 13px/1.6 sans-serif; margin: 8px 0 0; }
-  #raf { position: fixed; right: 8px; top: 6px; z-index: 20;
-    color: #6c6; font: 11px/1 Consolas, monospace; opacity: .8; }
-  #wlog { width: 800px; max-height: 140px; overflow-y: auto; margin: 6px 0 0;
-    padding: 4px 8px; box-sizing: border-box; white-space: pre-wrap;
+  html, body { margin: 0; height: 100%; background: #000; color: #ccc;
+    display: flex; }
+  /* ── 左侧控制面板 ── */
+  #side { width: 300px; flex: none; box-sizing: border-box; padding: 14px 12px;
+    display: flex; flex-direction: column; gap: 10px;
+    border-right: 1px solid #222; background: #0a0a0a; }
+  #side h1 { font: 15px/1.4 sans-serif; color: #ddd; margin: 0; }
+  #side label { font: 12px/1.4 sans-serif; color: #888; }
+  #script-path { box-sizing: border-box; width: 100%; padding: 8px 10px;
+    font: 13px/1 Consolas, monospace; color: #eee; background: #111;
+    border: 1px solid #333; border-radius: 6px; }
+  #script-path:focus { outline: none; border-color: #4a4; }
+  #run-btn, #pick-btn { padding: 10px 12px; font: 14px/1 sans-serif;
+    color: #eee; background: #222; border: 1px solid #555;
+    border-radius: 6px; cursor: pointer; text-align: left; }
+  #run-btn:hover { background: #333; border-color: #888; }
+  #pick-btn { color: #9c9; background: #141414; border: 1px dashed #4a4; }
+  #pick-btn:hover { background: #1e1e1e; }
+  #status { font: 11px/1.6 Consolas, monospace; color: #6c6;
+    min-height: 48px; white-space: pre-wrap; }
+  #hint { font: 11px/1.6 sans-serif; color: #555; margin-top: auto; }
+  /* ── 右侧主区：画布（尺寸由游戏 set_mode 决定，页面只防溢出）── */
+  #main { flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; min-width: 0; }
+  canvas { outline: none; max-width: 96vw; max-height: 82vh; }
+  #raf { color: #6c6; font: 11px/1 Consolas, monospace; opacity: .8;
+    align-self: flex-end; padding: 4px 10px; }
+  #wlog { width: calc(100% - 24px); box-sizing: border-box; height: 150px;
+    overflow-y: auto; padding: 4px 8px; white-space: pre-wrap;
     color: #9c9; background: #111; border: 1px solid #222; border-radius: 4px;
     font: 11px/1.5 Consolas, monospace; text-align: left; }
-  #start-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.88);
-    display: flex; flex-direction: column; gap: 14px;
-    align-items: center; justify-content: center; z-index: 10; }
-  #start-btn { padding: 14px 42px; font: 16px/1 sans-serif;
-    color: #eee; background: #222; border: 1px solid #555;
-    border-radius: 8px; cursor: pointer; }
-  #start-btn:hover { background: #333; border-color: #888; }
-  #pick-btn { padding: 12px 34px; font: 14px/1 sans-serif;
-    color: #9c9; background: #1a1a1a; border: 1px dashed #4a4;
-    border-radius: 8px; cursor: pointer; }
-  #pick-btn:hover { background: #222; }
-  #hint { color: #666; font: 12px/1.6 sans-serif; max-width: 640px;
-    text-align: center; }
 </style>
 </head>
 <body>
-<canvas id="starfish-we"></canvas>
-<div id="raf">raf 0</div>
-<p>【pygame-rs-dev】web 宿主（?script=&lt;路径&gt; 指定载荷，缺省 main.py）</p>
-<pre id="wlog" aria-label="console log"></pre>
-<div id="start-overlay">
-  <button id="start-btn">▶ 运行</button>
-  <button id="pick-btn">或选择本地 .py 单文件运行（-c 形态）</button>
-  <div id="hint">单文件脚本直跑（-c 形态；多模块工程桌面端开发调试）；
-    进程一次契约：换游戏请刷新页面</div>
+<div id="side">
+  <h1>pygame-rs-dev · web 宿主</h1>
+  <label for="script-path">脚本路径（web/ 目录内）</label>
+  <input id="script-path" placeholder="main.py">
+  <button id="run-btn">▶ 运行</button>
+  <label>本地单文件（-c 形态）</label>
+  <button id="pick-btn">选择本地 .py 运行</button>
+  <div id="status"></div>
+  <div id="hint">▶ 运行 = 重载并运行输入的脚本；本地文件 = 选完即自动运行。
+    均为独立进程（干净切换，无状态残留）。多模块工程暂以桌面端为准。</div>
+</div>
+<div id="main">
+  <canvas id="starfish-we"></canvas>
+  <div id="raf">raf 0</div>
+  <pre id="wlog" aria-label="console log"></pre>
 </div>
 <script type="module">
 (() => {
@@ -88,55 +102,107 @@ const _fmt = a => a.map(x => { try {
 for (const m of ['log', 'info', 'warn', 'error']) {
   const orig = console[m].bind(console);
   console[m] = (...a) => {
-    _wl.textContent += '[' + m + '] ' + _fmt(a) + '\\n';
-    const lines = _wl.textContent.split('\\n');
-    if (lines.length > 200) _wl.textContent = lines.slice(-200).join('\\n');
+    _wl.textContent += '[' + m + '] ' + _fmt(a) + '\n';
+    const lines = _wl.textContent.split('\n');
+    if (lines.length > 200) _wl.textContent = lines.slice(-200).join('\n');
     _wl.scrollTop = _wl.scrollHeight;
     orig(...a);
   };
 }
 window.addEventListener('error', e => {
   _wl.textContent += '[onerror] ' + (e.message || e.error) +
-    (e.filename ? ' @ ' + e.filename + ':' + e.lineno : '') + '\\n';
+    (e.filename ? ' @ ' + e.filename + ':' + e.lineno : '') + '\n';
 });
 window.addEventListener('unhandledrejection', e => {
-  _wl.textContent += '[rejection] ' + e.reason + '\\n';
+  _wl.textContent += '[rejection] ' + e.reason + '\n';
 });
 
-let exports = null;
+// ── 控制面板 ─────────────────────────────────────────────────
+const params = new URLSearchParams(location.search);
+const bootScript = params.get('script');
+const pathInput = document.getElementById('script-path');
+const runBtn = document.getElementById('run-btn');
+const pickBtn = document.getElementById('pick-btn');
+const fileInput = document.createElement('input');
+fileInput.type = 'file';
+fileInput.accept = '.py';
+document.body.appendChild(fileInput);
+fileInput.style.display = 'none';
+const statusEl = document.getElementById('status');
+const status = s => { statusEl.textContent = s; };
+
+pathInput.value = bootScript ?? 'main.py';
+
+let exports = null;      // wasm 导出（shim 句柄在 ensureInit 挂到全局）
+let pageStarted = false; // 本页是否已运行过程序（进程一次契约）
 const ensureInit = async () => {
-  if (!exports) exports = await init();
-  window.__pygame_rs_dev = { load_code: (c) => load_code(c) }; // shim 版导出（init() 返回的裸 wasm 导出无字符串编组）
+  if (!exports) {
+    exports = await init();
+    window.__pygame_rs_dev = { load_code: (c) => load_code(c) }; // shim 版导出（init() 返回的裸 wasm 导出无字符串编组）
+  }
   return exports;
 };
 import init, { load_code } from './python.js?v=__BUILD_TS__';
 
-// 路径通道：?script= 存在 → init 即自动拉取运行（web_start 内分派）
-const hasScript = new URLSearchParams(location.search).has('script');
-
-document.getElementById('start-btn').addEventListener('click', async () => {
+const runCode = async (code, label) => {
   await ensureInit();
-  if (hasScript) {
-    document.getElementById('start-overlay').remove();
+  load_code(code);
+  pageStarted = true;
+  status('运行 ' + label + '（-c 形态）');
+};
+
+// ── 路径通道（独立按钮）：▶ 运行 = 导航 ?script=<输入>（干净重载）──
+// 当前 ?script= 与输入一致且未启动 = 就地点火（web_start 自动分派）
+runBtn.addEventListener('click', async () => {
+  const p = pathInput.value.trim() || 'main.py';
+  if (bootScript === p && !pageStarted) {
+    await ensureInit();
+    pageStarted = true;
+    status('运行 ' + p);
+    return;
+  }
+  location.search = '?script=' + encodeURIComponent(p);
+});
+if (bootScript) {
+  runBtn.textContent = '▶ 启动 ' + bootScript;
+}
+
+// ── 文件通道（独立按钮）：选择即自动运行；运行中再选 = 暂存 + 自动
+// 重载重跑（一次动作完成切换）────────────────────────────────
+pickBtn.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', async () => {
+  const f = fileInput.files[0];
+  if (!f) return;
+  const text = await f.text();
+  if (!pageStarted) {
+    await runCode(text, f.name);
   } else {
-    console.log('未指定 ?script=——请用下方按钮选择本地 .py 文件');
+    sessionStorage.setItem('pygame_rs_dev_stash', f.name + '\n' + text);
+    status('切换到 ' + f.name + '…（自动重载运行）');
+    location.reload();
   }
 });
 
-// 文件通道：选择本地单文件 → load_code 注入运行（-c 形态）
-document.getElementById('pick-btn').addEventListener('click', () => {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.py';
-  input.onchange = async () => {
-    const f = input.files[0];
-    if (!f) return;
-    await ensureInit();
-    document.getElementById('start-overlay').remove();
-    load_code(await f.text());
-  };
-  input.click();
-});
+// ── 暂存自动消费：重载后零点击自动运行切换脚本 ──────────────────
+const stashRaw = sessionStorage.getItem('pygame_rs_dev_stash');
+if (stashRaw !== null) {
+  sessionStorage.removeItem('pygame_rs_dev_stash');
+  const cut = stashRaw.indexOf('\n');
+  runCode(stashRaw.slice(cut + 1), stashRaw.slice(0, cut));
+}
+
+// ── 自动点火（零点击）：?script= 载荷由 web_start 在 init 时分派——
+// 页面加载即触发 init（无手势仅音频自动播放受限，画面/逻辑不受影响）；
+// 暂存载荷已在上方自动消费 ──────────────────────────────────────
+if (bootScript) {
+  status('运行 ' + bootScript + '…');
+  ensureInit().then(() => {
+    pageStarted = true;
+    status('运行 ' + bootScript);
+  });
+} else {
+  status('就绪：输入路径运行，或选择本地 .py 文件');
+}
 </script>
 </body>
 </html>
