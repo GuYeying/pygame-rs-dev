@@ -8,7 +8,8 @@
 产物：pygame-rs-dev/web/
     index.html / python.js / python_bg.wasm   ← host（编译一次）
 游戏部署：把 bundle.py 放进 web/ 并命名为 main.py（或任意名后
-    ?script=<名> 指定），打开 index.html 点启动。
+    ?script=<名> 指定），打开 index.html 点启动；页面亦支持选择本地
+    .py / bundle 单文件直接运行（load_payload 通道）。
 
 测试：cd web 后起静态服务（file:// 无效，fetch 受 CORS 限制）
 前置：rustup target add wasm32-unknown-unknown；wasm-bindgen-cli 版本
@@ -19,7 +20,6 @@ import argparse
 import re
 import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -27,6 +27,7 @@ WEB = ROOT / "web"
 TARGET_DIR = ROOT / "target" / "wasm32-unknown-unknown" / "release"
 LOCK = ROOT / "Cargo.lock"
 
+# 模板占位符 __BUILD_TS__ 由脚本替换（不用 str.format——JS/CSS 花括号免转义）
 INDEX_TEMPLATE = """<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -45,13 +46,18 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
     color: #9c9; background: #111; border: 1px solid #222; border-radius: 4px;
     font: 11px/1.5 Consolas, monospace; text-align: left; }
   #start-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.88);
-    display: flex; flex-direction: column; gap: 12px;
+    display: flex; flex-direction: column; gap: 14px;
     align-items: center; justify-content: center; z-index: 10; }
   #start-btn { padding: 14px 42px; font: 16px/1 sans-serif;
     color: #eee; background: #222; border: 1px solid #555;
     border-radius: 8px; cursor: pointer; }
   #start-btn:hover { background: #333; border-color: #888; }
-  #hint { color: #666; font: 12px/1.6 sans-serif; }
+  #pick-btn { padding: 12px 34px; font: 14px/1 sans-serif;
+    color: #9c9; background: #1a1a1a; border: 1px dashed #4a4;
+    border-radius: 8px; cursor: pointer; }
+  #pick-btn:hover { background: #222; }
+  #hint { color: #666; font: 12px/1.6 sans-serif; max-width: 640px;
+    text-align: center; }
 </style>
 </head>
 <body>
@@ -60,8 +66,10 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
 <p>【pygame-rs-dev】web 宿主（?script=&lt;路径&gt; 指定载荷，缺省 main.py）</p>
 <pre id="wlog" aria-label="console log"></pre>
 <div id="start-overlay">
-  <button id="start-btn">▶ 点击启动</button>
-  <div id="hint">把 bundle.py 命名为 main.py 放在本页同目录即加载运行</div>
+  <button id="start-btn">▶ 运行 main.py（?script= 可指定）</button>
+  <button id="pick-btn">或选择本地 .py / bundle 单文件运行</button>
+  <div id="hint">单文件 = 自包含脚本或 bundle（多模块游戏请先打包为 bundle）；
+    进程一次契约：换游戏请刷新页面</div>
 </div>
 <script type="module">
 (() => {
@@ -94,10 +102,40 @@ window.addEventListener('unhandledrejection', e => {
   _wl.textContent += '[rejection] ' + e.reason + '\\n';
 });
 
-import init from './python.js?v={build_ts}';
-document.getElementById('start-btn').addEventListener('click', () => {
-  document.getElementById('start-overlay').remove();
-  init().catch(e => { document.body.textContent = 'wasm 加载失败: ' + e; console.error(e); });
+let exports = null;
+const ensureInit = async () => {
+  if (!exports) exports = await init();
+  window.__pygame_rs_dev = exports;   // 自动化/控制台注入载荷口
+  return exports;
+};
+import init from './python.js?v=__BUILD_TS__';
+
+// 路径通道：?script= 存在 → init 即自动拉取运行（web_start 内分派）
+const hasScript = new URLSearchParams(location.search).has('script');
+
+document.getElementById('start-btn').addEventListener('click', async () => {
+  await ensureInit();
+  if (hasScript) {
+    document.getElementById('start-overlay').remove();
+  } else {
+    console.log('未指定 ?script=——请用下方按钮选择本地 .py / bundle 文件');
+  }
+});
+
+// 文件通道：选择本地单文件 → load_payload 注入运行
+document.getElementById('pick-btn').addEventListener('click', () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.py';
+  input.onchange = async () => {
+    const f = input.files[0];
+    if (!f) return;
+    const ex = await ensureInit();
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    document.getElementById('start-overlay').remove();
+    ex.load_payload(f.name, bytes);
+  };
+  input.click();
 });
 </script>
 </body>
@@ -146,9 +184,10 @@ def main():
         sys.exit(f"[FAIL] wasm 产物缺失: {wasm}")
     WEB.mkdir(parents=True, exist_ok=True)
     sh(["wasm-bindgen", "--out-dir", str(WEB), "--target", "web", str(wasm)])
+    from datetime import datetime
     build_ts = datetime.now().strftime("%Y%m%d%H%M%S")
     (WEB / "index.html").write_text(
-        INDEX_TEMPLATE.format(build_ts=build_ts), encoding="utf-8")
+        INDEX_TEMPLATE.replace("__BUILD_TS__", build_ts), encoding="utf-8")
 
     # CJK 字体部署（宿主 preload_cjk 的取用路径；缺省静默）
     for src in (ROOT / "script_test" / "fonts" / "cjk.ttf",):
@@ -158,9 +197,10 @@ def main():
             dst.write_bytes(src.read_bytes())
             print(f"[OK] CJK 字体部署: {dst}")
 
-    print(f"[OK] web/index.html + python.js + python_bg.wasm")
+    print("[OK] web/index.html + python.js + python_bg.wasm")
     print("=== 游戏部署 ===")
-    print(f"  把 bundle.py 放入 {WEB} 并命名 main.py（或 ?script=<名> 指定）")
+    print(f"  把 bundle.py 放入 {WEB} 并命名 main.py（或 ?script=<名> 指定）；")
+    print("  页面亦可选本地 .py / bundle 单文件直接运行（load_payload）")
     print("=== 测试 ===")
     print(f"  cd {WEB} 后起静态服务，浏览器打开 index.html（file:// 无效）")
 
