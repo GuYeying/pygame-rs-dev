@@ -7,11 +7,12 @@
 
 产物：pygame-rs-dev/web/
     index.html / python.js / python_bg.wasm   ← host（编译一次）
-游戏部署：把 bundle.py 放进 web/ 并命名为 main.py（或任意名后
+游戏部署：把脚本放进 web/ 并命名为 main.py（或任意名后
     ?script=<名> 指定），打开 index.html 点启动；页面亦支持选择本地
-    .py / bundle 单文件直接运行（load_payload 通道）。
+    .py 单文件直接运行（-c 形态，load_code 通道）。
 
-测试：cd web 后起静态服务（file:// 无效，fetch 受 CORS 限制）
+测试：cd web 后起静态服务（file:// 无效，fetch 受 CORS 限制）——
+    也可用本解释器内置服务器：python.exe serve
 前置：rustup target add wasm32-unknown-unknown；wasm-bindgen-cli 版本
       与 Cargo.lock 严格一致（脚本自检）。
 """
@@ -67,8 +68,8 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
 <pre id="wlog" aria-label="console log"></pre>
 <div id="start-overlay">
   <button id="start-btn">▶ 运行 main.py（?script= 可指定）</button>
-  <button id="pick-btn">或选择本地 .py / bundle 单文件运行</button>
-  <div id="hint">单文件 = 自包含脚本或 bundle（多模块游戏请先打包为 bundle）；
+  <button id="pick-btn">或选择本地 .py 单文件运行（-c 形态）</button>
+  <div id="hint">单文件脚本直跑（-c 形态；多模块工程桌面端开发调试）；
     进程一次契约：换游戏请刷新页面</div>
 </div>
 <script type="module">
@@ -105,10 +106,10 @@ window.addEventListener('unhandledrejection', e => {
 let exports = null;
 const ensureInit = async () => {
   if (!exports) exports = await init();
-  window.__pygame_rs_dev = exports;   // 自动化/控制台注入载荷口
+  window.__pygame_rs_dev = { load_code: (c) => load_code(c) }; // shim 版导出（init() 返回的裸 wasm 导出无字符串编组）
   return exports;
 };
-import init from './python.js?v=__BUILD_TS__';
+import init, { load_code } from './python.js?v=__BUILD_TS__';
 
 // 路径通道：?script= 存在 → init 即自动拉取运行（web_start 内分派）
 const hasScript = new URLSearchParams(location.search).has('script');
@@ -118,11 +119,11 @@ document.getElementById('start-btn').addEventListener('click', async () => {
   if (hasScript) {
     document.getElementById('start-overlay').remove();
   } else {
-    console.log('未指定 ?script=——请用下方按钮选择本地 .py / bundle 文件');
+    console.log('未指定 ?script=——请用下方按钮选择本地 .py 文件');
   }
 });
 
-// 文件通道：选择本地单文件 → load_payload 注入运行
+// 文件通道：选择本地单文件 → load_code 注入运行（-c 形态）
 document.getElementById('pick-btn').addEventListener('click', () => {
   const input = document.createElement('input');
   input.type = 'file';
@@ -130,10 +131,9 @@ document.getElementById('pick-btn').addEventListener('click', () => {
   input.onchange = async () => {
     const f = input.files[0];
     if (!f) return;
-    const ex = await ensureInit();
-    const bytes = new Uint8Array(await f.arrayBuffer());
+    await ensureInit();
     document.getElementById('start-overlay').remove();
-    ex.load_payload(f.name, bytes);
+    load_code(await f.text());
   };
   input.click();
 });
@@ -199,10 +199,10 @@ def main():
 
     print("[OK] web/index.html + python.js + python_bg.wasm")
     print("=== 游戏部署 ===")
-    print(f"  把 bundle.py 放入 {WEB} 并命名 main.py（或 ?script=<名> 指定）；")
-    print("  页面亦可选本地 .py / bundle 单文件直接运行（load_payload）")
+    print(f"  把脚本放入 {WEB} 并命名 main.py（或 ?script=<名> 指定）；")
+    print("  页面亦可选本地 .py 单文件直接运行（-c 形态，load_code）")
     print("=== 测试 ===")
-    print(f"  cd {WEB} 后起静态服务，浏览器打开 index.html（file:// 无效）")
+    print(f"  cd {WEB} 后起静态服务（或 python.exe serve），浏览器打开 index.html")
 
 
 if __name__ == "__main__":

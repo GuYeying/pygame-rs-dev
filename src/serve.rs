@@ -51,8 +51,10 @@ pub fn serve(dir: &str, port: u16) -> ! {
             let file = Path::new(&root).join(rel.trim_start_matches('/'));
             match fs::read(&file) {
                 Ok(body) => {
+                    // no-cache：重建后 glue/wasm 必须重新拉取（无缓存头时
+                    // Chromium 启发式缓存会让浏览器拿旧产物——2026-10-26 实测坑）
                     let head = format!(
-                        "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n",
                         mime(rel),
                         body.len()
                     );
