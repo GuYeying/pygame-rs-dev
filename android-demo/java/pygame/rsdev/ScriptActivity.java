@@ -156,11 +156,25 @@ public class ScriptActivity extends Activity implements SurfaceHolder.Callback {
 
     /** 脚本文本预扫描：第一处 set_mode((w, h)) 的字面尺寸；无匹配 =
      *  800×600 兜底（动态尺寸场景，demo 层可接受）。 */
+    /** 第一处有效（非注释行）set_mode 匹配：'#' 出现在匹配位置之前
+     *  （同行）= 注释行跳过——probe 头注释含完整 set_mode 字面，曾把
+     *  注释里的数字当调用改写，真实调用纹丝不动 → 画布左上角对齐 */
+    private Matcher setModeMatch(String code) {
+        Matcher m = SET_MODE.matcher(code);
+        while (m.find()) {
+            int lineStart = code.lastIndexOf('\n', m.start()) + 1;
+            if (!code.substring(lineStart, m.start()).contains("#")) {
+                return m;
+            }
+        }
+        return null;
+    }
+
     private int[] prescanGeometry(String code) {
         int w = 800, h = 600;
         if (code != null) {
-            Matcher m = SET_MODE.matcher(code);
-            if (m.find()) {
+            Matcher m = setModeMatch(code);
+            if (m != null) {
                 try {
                     w = Integer.parseInt(m.group(1));
                     h = Integer.parseInt(m.group(2));
@@ -208,8 +222,8 @@ public class ScriptActivity extends Activity implements SurfaceHolder.Callback {
      *  屏幕；未找到字面尺寸则原样返回，脚本侧自适应属后续接口职责） */
     private String patchSetModeSize(String code, int w, int h) {
         if (code == null) return code;
-        Matcher m = SET_MODE.matcher(code);
-        if (m.find()) {
+        Matcher m = setModeMatch(code);
+        if (m != null) {
             String patched = code.substring(0, m.start(1)) + w + ", " + h
                     + code.substring(m.end(2));
             SdLog.log("set_mode 尺寸改写 → " + w + "x" + h + "（画布即屏幕）");
