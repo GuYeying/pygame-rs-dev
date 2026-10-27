@@ -4039,6 +4039,7 @@ dependencies = [
 name = "pygame-rs-dev"
 version = "0.1.1"
 dependencies = [
+ "android-activity",
  "jni-sys 0.3.1",
  "pygame-rs",
  "rustpython-derive",

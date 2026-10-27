@@ -27,6 +27,7 @@
 //! （robius 前置：ANDROID_JAR 环境变量；APK 组装用
 //!  pygame-rs/scripts/build_apk.py android_host --dir ..）
 
+use pygame_rs_dev::platform::mobile;
 use starfish_we::embedded;
 
 // ── libandroid.so 原生符号（尺寸读取用）────────────────────────
@@ -48,6 +49,63 @@ unsafe fn jstring_to_string(env: jni_sys::JNIEnv, s: jni_sys::jstring) -> String
     let release = (*(*env)).ReleaseStringUTFChars.expect("ReleaseStringUTFChars missing");
     release(env, s, ptr);
     text
+}
+
+// ── 独立运行形态（NativeActivity/glue）：android_main → 载荷裁决 ──
+// 脚本 = internalDataPath/main.py（adb run-as 推送）；缺省 = 内置演示
+//（触摸画线）。io 基准 = starfish 自动注入的 app 私有目录。
+#[cfg(target_os = "android")]
+const DEMO: &str = r#"import pygame
+async def main():
+    screen = pygame.display.set_mode((480, 320))
+    f = 0
+    pts = []
+    while True:
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                return
+            if e.type == pygame.MOUSEMOTION:
+                pts.append((e.pos[0], e.pos[1]))
+                if len(pts) > 300:
+                    pts.pop(0)
+        with screen.render() as r:
+            r.fill((255, 140, 0))
+            for i in range(1, len(pts)):
+                pygame.draw.line(r, (30, 30, 30), pts[i - 1], pts[i], 5)
+        pygame.display.flip()
+        await pygame.next_frame()
+"#;
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+fn android_main(app: android_activity::AndroidApp) {
+    starfish_std::we::android_init(app.clone());
+    starfish_std::run_control::reset();
+    let base = app
+        .internal_data_path()
+        .and_then(|p| p.into_os_string().into_string().ok())
+        .unwrap_or_else(|| ".".to_string());
+    let script_path = format!("{base}/main.py");
+    let (name, code) = match std::fs::read_to_string(&script_path) {
+        Ok(code) => ("main.py", code),
+        Err(_) => ("demo.py", DEMO.to_string()),
+    };
+    starfish_std::debug::console_log(&format!(
+        "[pygame-rs-dev] android 载荷 = {name}（{} B；脚本目录 {base}）",
+        code.len()
+    ));
+    let host = pygame_rs_dev::platform::mobile::MobileHost {
+        name: name.to_string(),
+        code,
+    };
+    let exit = starfish_std::app::block_on(async move {
+        pygame_rs_dev::runtime::run(&host).await
+    });
+    if exit != 0 {
+        starfish_std::debug::console_log(&format!(
+            "[pygame-rs-dev] 运行结束（退出码 {exit}）"
+        ));
+    }
 }
 
 #[no_mangle]

@@ -52,11 +52,12 @@ starfish-io = { path = "../starfish/crates/starfish-io" }
 [target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
 starfish-dialog = { path = "../starfish/crates/starfish-dialog" }
 
-[profile.release]
-strip = true
-
-# ── Android 嵌入式调试壳（examples/android_host.rs 的 JNI 面）──
+# ── Android 宿主（嵌入模式 JNI 面 + android_host 独立运行入口）──
 [target.'cfg(target_os = "android")'.dependencies]
 starfish-we = { path = "../starfish/crates/starfish-we" }
 starfish-io = { path = "../starfish/crates/starfish-io" }
 jni-sys = "0.3"
+android-activity = "0.6"
+
+[profile.release]
+strip = true
