@@ -35,33 +35,45 @@ thread_local! {
 /// 进程一次契约守门（本页只运行一个程序；换游戏 = 刷新页面）
 static STARTED: AtomicBool = AtomicBool::new(false);
 
-/// %XX 解码（查询参数值；'+' 保持字面——路径场景空格应编码为 %20）
+/// %XX 解码 + '+' → 空格（application/x-www-form-urlencoded 查询串
+/// 标准语义——URL 规范化会把空格写作 '+'；字面 '+' 须编码为 %2B）
 fn decode_percent(s: &str) -> String {
     let bytes = s.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
     while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let Ok(v) = u8::from_str_radix(
-                std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or(""),
-                16,
-            ) {
-                out.push(v);
-                i += 3;
-                continue;
+        match bytes[i] {
+            b'%' if i + 2 < bytes.len() => {
+                if let Ok(v) = u8::from_str_radix(
+                    std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or(""),
+                    16,
+                ) {
+                    out.push(v);
+                    i += 3;
+                    continue;
+                }
+                out.push(bytes[i]);
+                i += 1;
+            }
+            b'+' => {
+                out.push(b' ');
+                i += 1;
+            }
+            c => {
+                out.push(c);
+                i += 1;
             }
         }
-        out.push(bytes[i]);
-        i += 1;
     }
     String::from_utf8_lossy(&out).into_owned()
 }
 
 /// 查询串解析 → (script 路径, argv 参数列表)
-fn parse_query() -> (Option<String>, Vec<String>) {
+fn parse_query() -> (Option<String>, Option<String>, Vec<String>) {
     let search = web_sys::window()
         .and_then(|w| w.location().search().ok())
         .unwrap_or_default();
+    let mut code = None;
     let mut script = None;
     let mut argv = Vec::new();
     for kv in search.strip_prefix('?').unwrap_or("").split('&') {
@@ -73,12 +85,13 @@ fn parse_query() -> (Option<String>, Vec<String>) {
             None => (kv, String::new()),
         };
         match k {
+            "code" if code.is_none() => code = Some(v),
             "script" if script.is_none() => script = Some(v),
             "argv" => argv.push(v),
             _ => {}
         }
     }
-    (script, argv)
+    (code, script, argv)
 }
 
 /// 路径形态宿主（`python <路径> [参数...]` 映射：io fetch 加载）
@@ -119,9 +132,11 @@ impl crate::host::Host for ScriptHost {
     }
 }
 
-/// `-c` 形态宿主（JS 直传代码串；argv 取平台参数槽）
+/// `-c` 形态宿主（JS 直传代码串；args = 平台参数槽 + ?script= 首参——
+/// python `-c` 同语义：`python -c "code" arg0` → sys.argv = ['-c', 'arg0']）
 struct CodeHost {
     code: String,
+    extra_args: Vec<String>,
 }
 
 impl crate::host::Host for CodeHost {
@@ -130,7 +145,7 @@ impl crate::host::Host for CodeHost {
     }
 
     fn args(&self) -> Vec<String> {
-        ARGS.with(|a| a.borrow().clone())
+        self.extra_args.clone()
     }
 
     async fn acquire(&self) -> Result<RunRequest, String> {
@@ -142,19 +157,25 @@ impl crate::host::Host for CodeHost {
     }
 }
 
-/// 启动闸门（幂等）：代码槽有内容 → `-c` 形态；否则 `?script=` → 路径
-/// 形态；两者皆无 → 返回 false（等待 load_code，不启动）
-fn try_start(script_url: Option<String>) -> bool {
+/// 启动闸门（幂等）：代码槽/`?code=` 有内容 → `-c` 形态；否则 `?script=`
+/// → 路径形态；两者皆无 → 返回 false（等待 load_code，不启动）
+fn try_start(code_url: Option<String>, script_url: Option<String>) -> bool {
     if STARTED.swap(true, Ordering::SeqCst) {
         console_log("[pygame-rs-dev] 进程一次契约：本页已运行过程序——换游戏请刷新页面");
         return true;
     }
-    let code = CODE.with(|c| c.borrow_mut().take());
+    let code = CODE.with(|c| c.borrow_mut().take()).or(code_url);
     match code {
         Some(code) => {
-            console_log("[pygame-rs-dev] 载荷 = -c 代码串（页面注入）");
+            console_log("[pygame-rs-dev] 载荷 = -c 代码串（页面注入/?code=）");
+            // python -c 同语义：?script= 降级为 sys.argv[1]
+            let mut extra_args = Vec::new();
+            if let Some(s) = script_url {
+                extra_args.push(s);
+            }
+            extra_args.extend(ARGS.with(|a| a.borrow().clone()));
             wasm_bindgen_futures::spawn_local(async move {
-                let host = CodeHost { code };
+                let host = CodeHost { code, extra_args };
                 let code = crate::runtime::run(&host).await;
                 if code != 0 {
                     console_log(&format!("[pygame-rs-dev] 运行结束（退出码 {code}）"));
@@ -165,8 +186,11 @@ fn try_start(script_url: Option<String>) -> bool {
         None => match script_url {
             Some(url) => {
                 let argv = ARGS.with(|a| a.borrow().clone());
+                console_log(&format!(
+                    "[pygame-rs-dev] web 载荷 = {url}（fetch；argv {argv:?}）"
+                ));
                 wasm_bindgen_futures::spawn_local(async move {
-                    let host = ScriptHost::new(url, argv);
+                    let host = ScriptHost { script_url: url, argv };
                     let code = crate::runtime::run(&host).await;
                     if code != 0 {
                         console_log(&format!("[pygame-rs-dev] 运行结束（退出码 {code}）"));
@@ -190,9 +214,9 @@ pub async fn web_start() -> Result<(), wasm_bindgen::JsValue> {
     std::panic::set_hook(Box::new(|info| {
         console_log(&format!("[panic] {info}"));
     }));
-    let (script, argv) = parse_query();
+    let (code, script, argv) = parse_query();
     ARGS.with(|a| *a.borrow_mut() = argv);
-    if !try_start(script) {
+    if !try_start(code, script) {
         console_log("[pygame-rs-dev] 等待载荷：页面选择本地 .py 文件（-c 形态），或 ?script= 指定 URL");
     }
     Ok(())
@@ -204,6 +228,6 @@ pub async fn web_start() -> Result<(), wasm_bindgen::JsValue> {
 pub fn load_code(code: String) {
     CODE.with(|c| *c.borrow_mut() = Some(code));
     console_log("[pygame-rs-dev] 载荷注入 = -c 代码串");
-    let script = parse_query().0;
-    try_start(script);
+    let (_, script, _) = parse_query();
+    try_start(None, script);
 }
