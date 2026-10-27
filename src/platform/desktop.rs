@@ -19,9 +19,9 @@ pub fn desktop_main() -> ! {
             crate::serve::serve(&dir, port); // 内置静态服务器（不返回）
         }
         let code = crate::runtime::run(&host).await;
-        if code != 0 {
-            std::process::exit(code);
-        }
+        // 无条件 exit（0 也走）：block_on 返回即运行终结——落到底部的
+        // unreachable 会把成功收尾变成 panic 101（正常返回型脚本首跑实证）
+        std::process::exit(code);
     });
     unreachable!("block_on 完成后必经 exit 或分支不返回")
 }

@@ -26,10 +26,19 @@ class HUD(egui.UiBase):
         self.mode = 1                    # radio/combo 共享选中序号
         self.speed = 1.0
         self.sel = False
+        self.ev_n = 0                    # 事件流计数（到达脚本层的事件数）
+        self.last_ev = "-"               # 最后一条事件的类型标签
+        self.last_xy = "-"               # 最后一条鼠标移动的坐标（脚本实收）
 
     def draw(self, ui):
         self.frames += 1
         ui.heading("egui-starfish-we HUD 测试")
+        # 指针位置实时显示（呈现映射排障）：此处显示值 vs 手指实际位置
+        # ——两者差 = 坐标链残余偏移/缩放，一眼可算；wants_pointer =
+        # egui 是否认为指针悬在可交互控件上（False = 事件没到/坐标错）
+        ui.label(f"指针 pos = {pygame.mouse.get_pos()}（对照手指实际位置）")
+        ui.label(f"事件流 n={self.ev_n} last={self.last_ev} xy={self.last_xy}")
+        ui.label(f"wants_pointer = {egui.wants_pointer()}")
         ui.label("pygame_gui OOP 门面 · 中文渲染验收")
         if ui.button("点我 (button)"):
             self.clicks += 1
@@ -58,7 +67,10 @@ class HUD(egui.UiBase):
 
 
 async def main():
-    screen = pygame.display.set_mode((800, 600))
+    # FULLSCREEN 位（1 << 1，引擎 display 位定义；Python 常量面未开放）：
+    # Android 宿主布局拉伸铺满整屏 + 触摸按比例反算——egui 全屏联测
+    FULLSCREEN = 2
+    screen = pygame.display.set_mode((800, 600), FULLSCREEN)
     cjk = pygame.font.Font("cjk", 20)
     game_state = {"size": [800, 600]}
     _fail = []
@@ -121,6 +133,12 @@ async def main():
     frame_no = 0
     while True:
         for e in pygame.event.get():
+            hud.ev_n += 1
+            if e.type == pygame.event.MOUSEMOTION:
+                hud.last_ev = "motion"
+                hud.last_xy = f"({e.x},{e.y})"
+            else:
+                hud.last_ev = str(e.type)
             egui.event(e)                # 显式逐条喂（不喂 = egui 无输入）
             if e.type == pygame.event.QUIT:
                 return
@@ -130,6 +148,8 @@ async def main():
         with screen.render() as t:
             t.fill((18, 20, 28))
             t.blit(label, (16, 12))
+            # 引擎指针落点校准（红圈）：红圈应贴手指——偏了 = 坐标链问题
+            t.circle((255, 0, 0), pygame.mouse.get_pos(), 12)
             if frame_no == 0:
                 no_raise("t.draw_ui 首帧", lambda: t.draw_ui(hud))
             else:

@@ -58,6 +58,10 @@ starfish-we = { path = "../starfish/crates/starfish-we" }
 starfish-io = { path = "../starfish/crates/starfish-io" }
 jni-sys = "0.3"
 android-activity = "0.6"
+# 嵌入形态由宿主经 JNI 导出注入（nativeInitContext）——cpal/robius 等
+# JNI 消费方读同一静态；无 glue 时无人初始化，脚本一碰音频即 panic
+#（真机实证）；版本须与依赖树现存严格一致（单实例归一）
+ndk-context = "0.1.1"
 
 [profile.release]
 strip = true

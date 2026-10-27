@@ -14,7 +14,8 @@ use starfish_pygame::display;
 use starfish_std::debug::{console_log, Stopwatch};
 
 /// 日志出口 = console_log 单路（桌面 stdout / wasm 控制台——runtime
-/// 对平台不可知，web 端 println 不可见故不走 println）
+/// 对平台不可知，web 端 println 不可见故不走 println）。壳注入了
+/// 诊断 sink 时（Android dev_log.txt）每条自动同步落盘
 fn log(msg: &str) {
     console_log(msg);
 }
@@ -38,8 +39,10 @@ pub async fn run<H: Host>(host: &H) -> i32 {
         let _ = std::env::set_current_dir(root);
     }
     // ── 控制台阶段：建窗前完成全部确定性启动开销（各阶段打点——
-    // 顺序与耗时可审计，"白窗等待"归因用）──
+    // 顺序与耗时可审计，"白窗等待"归因用；"开始/就绪"成对——崩溃
+    // 定位到具体阶段）──
     let t_rp = Stopwatch::now();
+    log(&format!("[{name}] ①genesis 开始"));
     let interp = rpy::new_interpreter();
     log(&format!("[{name}] ①解释器就绪 {}ms", t_rp.ms()));
     interp.enter(|vm| set_argv(vm, &req.name, &host.args())); // python 标准 sys.argv
@@ -55,6 +58,7 @@ pub async fn run<H: Host>(host: &H) -> i32 {
         });
     }
     let t_font = Stopwatch::now();
+    log(&format!("[{name}] ②字体预载开始"));
     rpy::testhost::preload_cjk(name).await;
     log(&format!("[{name}] ②字体预载完 {}ms", t_font.ms()));
     // ── 创建期旗标预扫描（dev 解释器启发式）：TRANSPARENT 等创建期
@@ -78,6 +82,7 @@ pub async fn run<H: Host>(host: &H) -> i32 {
     }
     // ── 建窗（可见；GPU/交换链装配承载于窗口期——百 ms 级）──
     let t_gpu = Stopwatch::now();
+    log(&format!("[{name}] ③建窗+GPU装配开始（旗标 {host_flags:#b}）"));
     if let Err(e) = display::set_mode_ex((800, 600), host_flags).await {
         log(&format!("[{name}] set_mode 失败: {e}"));
         return 1;

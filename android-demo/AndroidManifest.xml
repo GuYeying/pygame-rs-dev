@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  pygame-rs-dev 原生 UI demo app（嵌入式 .so 交付形态的参考宿主）：
+  普通 Activity（非 NativeActivity）+ PygameRsDev JNI 门面——
+  演示原生 Android 开发者如何把 pygame 运行时嵌进自己的 app。
+  包名 pygame.rsdev 与 .so 的 JNI 符号（Java_pygame_rsdev_*）严格对齐。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="pygame.rsdev"
+    android:versionCode="1"
+    android:versionName="0.1.0">
+
+    <!-- minSdk 26：cpal AAudio 硬性下限 -->
+    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- wgpu GLES 后端兜底需 GLES 3.x -->
+    <uses-feature android:glEsVersion="0x00030000" android:required="true" />
+
+    <application
+        android:label="pygame-rs demo"
+        android:hasCode="true" android:debuggable="true"
+        android:extractNativeLibs="true">
+
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".ScriptActivity"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"
+            android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen" />
+    </application>
+</manifest>

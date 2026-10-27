@@ -4041,6 +4041,7 @@ version = "0.1.1"
 dependencies = [
  "android-activity",
  "jni-sys 0.3.1",
+ "ndk-context",
  "pygame-rs",
  "rustpython-derive",
  "rustpython-pylib",
