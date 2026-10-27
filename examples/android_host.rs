@@ -79,16 +79,50 @@ async def main():
 #[cfg(target_os = "android")]
 #[no_mangle]
 fn android_main(app: android_activity::AndroidApp) {
-    starfish_std::we::android_init(app.clone());
-    starfish_std::run_control::reset();
+    // ── 诊断日志：写到 app 外部存储目录（/sdcard/Android/data/<包名>/files/）
+    // ——USB 文件传输**免 root 直拉**，比 internalDataPath 的 run-as 便捷──
     let base = app
-        .internal_data_path()
+        .external_data_path()
         .and_then(|p| p.into_os_string().into_string().ok())
-        .unwrap_or_else(|| ".".to_string());
+        .unwrap_or_else(|| {
+            app.internal_data_path()
+                .and_then(|p| p.into_os_string().into_string().ok())
+                .unwrap_or_else(|| ".".to_string())
+        });
+    let log_path = format!("{base}/dev_log.txt");
+    let log_path_for_dlog = log_path.clone();
+    let dlog = move |s: &str| {
+        use std::io::Write;
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).create(true).open(&log_path_for_dlog) {
+            let _ = writeln!(f, "{s}");
+        }
+        starfish_std::debug::console_log(&format!("[pygame-rs-dev] {s}"));
+    };
+    // panic 钩子：崩溃信息也落入同一文件
+    let log_path_clone = log_path.clone();
+    std::panic::set_hook(Box::new(move |info| {
+        let msg = format!("[PANIC] {info}");
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).create(true).open(&log_path_clone) {
+            use std::io::Write;
+            let _ = writeln!(f, "{msg}");
+        }
+        starfish_std::debug::console_log(&msg);
+    }));
+    let _ = std::fs::remove_file(&log_path);
+    dlog("0 android_main entry");
+    starfish_std::we::android_init(app.clone());
+    dlog("1 android_init ok");
+    starfish_std::run_control::reset();
     let script_path = format!("{base}/main.py");
     let (name, code) = match std::fs::read_to_string(&script_path) {
-        Ok(code) => ("main.py", code),
-        Err(_) => ("demo.py", DEMO.to_string()),
+        Ok(code) => {
+            dlog("2 main.py 读取 ok");
+            ("main.py", code)
+        }
+        Err(_) => {
+            dlog("2 main.py 不存在 → demo");
+            ("demo.py", DEMO.to_string())
+        }
     };
     starfish_std::debug::console_log(&format!(
         "[pygame-rs-dev] android 载荷 = {name}（{} B；脚本目录 {base}）",
@@ -98,14 +132,23 @@ fn android_main(app: android_activity::AndroidApp) {
         name: name.to_string(),
         code,
     };
-    let exit = starfish_std::app::block_on(async move {
-        pygame_rs_dev::runtime::run(&host).await
-    });
-    if exit != 0 {
-        starfish_std::debug::console_log(&format!(
-            "[pygame-rs-dev] 运行结束（退出码 {exit}）"
-        ));
-    }
+    dlog("3 runtime::run start（16MB 大栈线程——RP genesis 需要）");
+    // 大栈线程驱动 RP（glue 线程栈不够 RP genesis；桌面同样需要 16MB）
+    let handle = std::thread::Builder::new()
+        .stack_size(16 * 1024 * 1024)
+        .spawn(move || {
+            let exit = starfish_std::app::block_on(async move {
+                pygame_rs_dev::runtime::run(&host).await
+            });
+            dlog(&format!("4 runtime::run 完成（退出码 {exit}）"));
+            exit
+        })
+        .expect("spawn engine thread");
+    let exit = handle.join().unwrap_or(1);
+    // 与 app_entry! 宏同模式：exit 阻止 glue 清理代码执行——
+    // android_main 返回后 InputQueue::detachLooper() 会撞已销毁互斥锁
+    //（FORTIFY abort，tombstone 实证），直接退出进程绕过
+    std::process::exit(exit);
 }
 
 #[no_mangle]
