@@ -222,12 +222,14 @@ pub async fn web_start() -> Result<(), wasm_bindgen::JsValue> {
     Ok(())
 }
 
-/// 页面代码注入（`python -c` 映射）：JS 侧读入的代码串直传运行。
-/// `exports.load_code(代码串)`——语法问题在运行期以 traceback 呈现。
+/// 页面代码注入（`python -c` 映射）：JS 侧读入的代码串 + 参数列表直传
+/// 运行。`exports.load_code(代码串, 参数列表)`——真 python `-c` 同语义：
+/// sys.argv = [程序名, 参数...]；语法问题在运行期以 traceback 呈现。
 #[wasm_bindgen]
-pub fn load_code(code: String) {
+pub fn load_code(code: String, args: Vec<String>) {
     CODE.with(|c| *c.borrow_mut() = Some(code));
-    console_log("[pygame-rs-dev] 载荷注入 = -c 代码串");
+    ARGS.with(|a| *a.borrow_mut() = args);
+    console_log("[pygame-rs-dev] 载荷注入 = -c 代码串 + 平台参数");
     let (_, script, _) = parse_query();
     try_start(None, script);
 }

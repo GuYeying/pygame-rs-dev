@@ -74,8 +74,10 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   <h1>pygame-rs-dev · web 宿主</h1>
   <label for="script-path">脚本路径（web/ 目录内）</label>
   <input id="script-path" placeholder="main.py">
+  <label for="script-args">命令参数（空格分隔，透传 sys.argv）</label>
+  <input id="script-args" placeholder="--level fast">
   <button id="run-btn">▶ 运行</button>
-  <label>本地单文件（-c 形态）</label>
+  <label>本地单文件（-c 形态，参数同样生效）</label>
   <button id="pick-btn">选择本地 .py 运行</button>
   <div id="status"></div>
   <div id="hint">▶ 运行 = 重载并运行输入的脚本；本地文件 = 选完即自动运行。
@@ -120,7 +122,9 @@ window.addEventListener('unhandledrejection', e => {
 // ── 控制面板 ─────────────────────────────────────────────────
 const params = new URLSearchParams(location.search);
 const bootScript = params.get('script');
+const bootArgv = params.getAll('argv');
 const pathInput = document.getElementById('script-path');
+const argsInput = document.getElementById('script-args');
 const runBtn = document.getElementById('run-btn');
 const pickBtn = document.getElementById('pick-btn');
 const fileInput = document.createElement('input');
@@ -132,27 +136,30 @@ const statusEl = document.getElementById('status');
 const status = s => { statusEl.textContent = s; };
 
 pathInput.value = bootScript ?? 'main.py';
+argsInput.value = bootArgv.join(' ');
 
 let exports = null;      // wasm 导出（shim 句柄在 ensureInit 挂到全局）
 let pageStarted = false; // 本页是否已运行过程序（进程一次契约）
 const ensureInit = async () => {
   if (!exports) {
     exports = await init();
-    window.__pygame_rs_dev = { load_code: (c) => load_code(c) }; // shim 版导出（init() 返回的裸 wasm 导出无字符串编组）
+    window.__pygame_rs_dev = { load_code: (c, a) => load_code(c, a ?? []) }; // shim 版导出（init() 返回的裸 wasm 导出无字符串编组）
   }
   return exports;
 };
 import init, { load_code } from './python.js?v=__BUILD_TS__';
 
+const currentArgs = () => argsInput.value.trim().split(/\s+/).filter(Boolean);
+
 const runCode = async (code, label) => {
   await ensureInit();
-  load_code(code);
+  load_code(code, currentArgs());
   pageStarted = true;
-  status('运行 ' + label + '（-c 形态）');
+  status('运行 ' + label + '（-c 形态，argv = ' + JSON.stringify(currentArgs()) + '）');
 };
 
-// ── 路径通道（独立按钮）：▶ 运行 = 导航 ?script=<输入>（干净重载）──
-// 当前 ?script= 与输入一致且未启动 = 就地点火（web_start 自动分派）
+// ── 路径通道（独立按钮）：▶ 运行 = 导航 ?script=<输入> + ?argv=<参数…>
+//（干净重载，参数透传 sys.argv）────────────────────────────────
 runBtn.addEventListener('click', async () => {
   const p = pathInput.value.trim() || 'main.py';
   if (bootScript === p && !pageStarted) {
@@ -163,6 +170,9 @@ runBtn.addEventListener('click', async () => {
   }
   const sp = new URLSearchParams(location.search); // 保留 script 以外的参数（如 argv=...）
   sp.set('script', p);
+  const args = currentArgs();
+  sp.delete('argv');
+  for (const a of args) sp.append('argv', a);
   location.search = '?' + sp.toString();
 });
 if (bootScript) {
@@ -193,9 +203,9 @@ if (stashRaw !== null) {
   runCode(stashRaw.slice(cut + 1), stashRaw.slice(0, cut));
 }
 
-// ── 自动点火（零点击）：?script= 载荷由 web_start 在 init 时分派——
-// 页面加载即触发 init（无手势仅音频自动播放受限，画面/逻辑不受影响）；
-// 暂存载荷已在上方自动消费 ──────────────────────────────────────
+// ── 自动点火（零点击）：wasm 加载即初始化（load_code 通道随时可用）；
+// ?script= 载荷由 web_start 在 init 时分派；暂存载荷自动消费 ──────
+ensureInit();
 if (bootScript) {
   status('运行 ' + bootScript + '…');
   ensureInit().then(() => {
