@@ -157,56 +157,48 @@ impl crate::host::Host for CodeHost {
     }
 }
 
-/// 启动闸门（幂等）：代码槽/`?code=` 有内容 → `-c` 形态；否则 `?script=`
-/// → 路径形态；两者皆无 → 返回 false（等待 load_code，不启动）
-fn try_start(code_url: Option<String>, script_url: Option<String>) -> bool {
+/// 启动闸门（幂等，进程一次契约）：本页只允许一次运行；换游戏请刷新页面。
+fn guard() -> bool {
     if STARTED.swap(true, Ordering::SeqCst) {
         console_log("[pygame-rs-dev] 进程一次契约：本页已运行过程序——换游戏请刷新页面");
-        return true;
+        return false;
     }
-    let code = CODE.with(|c| c.borrow_mut().take()).or(code_url);
-    match code {
-        Some(code) => {
-            console_log("[pygame-rs-dev] 载荷 = -c 代码串（页面注入/?code=）");
-            // python -c 同语义：?script= 降级为 sys.argv[1]
-            let mut extra_args = Vec::new();
-            if let Some(s) = script_url {
-                extra_args.push(s);
-            }
-            extra_args.extend(ARGS.with(|a| a.borrow().clone()));
-            wasm_bindgen_futures::spawn_local(async move {
-                let host = CodeHost { code, extra_args };
-                let code = crate::runtime::run(&host).await;
-                if code != 0 {
-                    console_log(&format!("[pygame-rs-dev] 运行结束（退出码 {code}）"));
-                }
-            });
-            true
-        }
-        None => match script_url {
-            Some(url) => {
-                let argv = ARGS.with(|a| a.borrow().clone());
-                console_log(&format!(
-                    "[pygame-rs-dev] web 载荷 = {url}（fetch；argv {argv:?}）"
-                ));
-                wasm_bindgen_futures::spawn_local(async move {
-                    let host = ScriptHost { script_url: url, argv };
-                    let code = crate::runtime::run(&host).await;
-                    if code != 0 {
-                        console_log(&format!("[pygame-rs-dev] 运行结束（退出码 {code}）"));
-                    }
-                });
-                true
-            }
-            None => {
-                STARTED.store(false, Ordering::SeqCst);
-                false
-            }
-        },
-    }
+    true
 }
 
-/// wasm 真入口（async 支持；wasm-bindgen start 属性）
+/// `-c` 形态运行（代码串 + 参数；python -c 映射）
+fn start_code(code: String) {
+    console_log("[pygame-rs-dev] 载荷 = -c 代码串（页面注入）");
+    let extra_args = ARGS.with(|a| a.borrow().clone());
+    wasm_bindgen_futures::spawn_local(async move {
+        let host = CodeHost { code, extra_args };
+        let code = crate::runtime::run(&host).await;
+        if code != 0 {
+            console_log(&format!("[pygame-rs-dev] 运行结束（退出码 {code}）"));
+        }
+    });
+}
+
+/// 路径形态运行（fetch 加载；python <路径> 映射）
+fn start_fetch(url: String) {
+    let argv = ARGS.with(|a| a.borrow().clone());
+    console_log(&format!(
+        "[pygame-rs-dev] web 载荷 = {url}（fetch；argv {argv:?}）"
+    ));
+    wasm_bindgen_futures::spawn_local(async move {
+        let host = ScriptHost { script_url: url, argv };
+        let code = crate::runtime::run(&host).await;
+        if code != 0 {
+            console_log(&format!("[pygame-rs-dev] 运行结束（退出码 {code}）"));
+        }
+    });
+}
+
+/// wasm 真入口（async 支持；wasm-bindgen start 属性）——**只装配，不
+/// 分派**：载荷通道由页面 boot 逻辑裁决（暂存 > ?script= > 等待），
+/// 消除"URL 参数与注入载荷竞争启动权"的双跑/抢占问题
+///（2026-10-26 用户实测：?script= 重载残留导致强制 main.py + 悬空
+/// OOB rejection 的根因）。
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen(start)]
 pub async fn web_start() -> Result<(), wasm_bindgen::JsValue> {
@@ -214,11 +206,10 @@ pub async fn web_start() -> Result<(), wasm_bindgen::JsValue> {
     std::panic::set_hook(Box::new(|info| {
         console_log(&format!("[panic] {info}"));
     }));
-    let (code, script, argv) = parse_query();
+    // 平台参数槽（?argv= 重复键——start_script / -c 宿主 args 用）
+    let (_, _, argv) = parse_query();
     ARGS.with(|a| *a.borrow_mut() = argv);
-    if !try_start(code, script) {
-        console_log("[pygame-rs-dev] 等待载荷：页面选择本地 .py 文件（-c 形态），或 ?script= 指定 URL");
-    }
+    console_log("[pygame-rs-dev] web 宿主就绪（等待载荷分派）");
     Ok(())
 }
 
@@ -227,9 +218,19 @@ pub async fn web_start() -> Result<(), wasm_bindgen::JsValue> {
 /// sys.argv = [程序名, 参数...]；语法问题在运行期以 traceback 呈现。
 #[wasm_bindgen]
 pub fn load_code(code: String, args: Vec<String>) {
-    CODE.with(|c| *c.borrow_mut() = Some(code));
+    if !guard() {
+        return;
+    }
     ARGS.with(|a| *a.borrow_mut() = args);
-    console_log("[pygame-rs-dev] 载荷注入 = -c 代码串 + 平台参数");
-    let (_, script, _) = parse_query();
-    try_start(None, script);
+    start_code(code);
+}
+
+/// 路径拉取运行（`python <路径>` 映射）：fetch 加载脚本。
+/// `exports.start_script(路径)`——页面 boot 裁决后的显式入口。
+#[wasm_bindgen]
+pub fn start_script(url: String) {
+    if !guard() {
+        return;
+    }
+    start_fetch(url);
 }
