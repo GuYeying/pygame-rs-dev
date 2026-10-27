@@ -29,7 +29,7 @@
 
     <application
         android:label="starfish"
-        android:hasCode="false"
+        android:hasCode="true"
         android:requestLegacyExternalStorage="true"
         android:extractNativeLibs="true">
 
@@ -37,7 +37,7 @@
             android:name="android.app.NativeActivity"
             android:exported="true"
             android:launchMode="singleInstance"
-            android:screenOrientation="__ORIENTATION__"
+            android:screenOrientation="sensorLandscape"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"
             android:theme="@style/StarfishTheme">
             <meta-data
