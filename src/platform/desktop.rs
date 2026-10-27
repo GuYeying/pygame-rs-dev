@@ -1,5 +1,5 @@
 //! 桌面宿主实现（首个 [`Host`](crate::host::Host) 实现者）：CLI 解析、
-//! 载荷读盘、REPL 交互形态。行为与 trait 化前逐字节一致。
+//! 载荷读盘、REPL 交互形态、内置静态服务器分派。
 //!
 //! 载荷获取 = std::fs 同步读；模块根 = 脚本父目录（运行时切 cwd——
 //! python sys.path[0] 同语义）。
@@ -7,6 +7,25 @@
 use crate::host::RunRequest;
 use pygame_rs::rpy;
 use rustpython_vm::VirtualMachine;
+
+/// 桌面入口（REPL/serve/运行 三分派 + 退出码；`-> !` 不返回）
+pub fn desktop_main() -> ! {
+    starfish_std::app::block_on(async move {
+        let host = DesktopHost::from_env();
+        if host.wants_repl() {
+            repl_mode(); // 桌面专属交互形态（不返回）
+        }
+        if let Some((dir, port)) = host.serve_request() {
+            crate::serve::serve(&dir, port); // 内置静态服务器（不返回）
+        }
+        let code = crate::runtime::run(&host).await;
+        if code != 0 {
+            std::process::exit(code);
+        }
+    });
+    unreachable!("block_on 完成后必经 exit 或分支不返回")
+}
+
 
 /// CLI 解析结果（python 标准命令行三形态 + serve 子命令）
 enum Mode {

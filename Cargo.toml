@@ -5,19 +5,31 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "pygame-rs-dev —— pygame 的 python（开发解释器）：pygame 全内置、零 Rust 工具链"
 
+[lib]
+# 库 = 宿主运行时（host trait / runtime / platform 各实现）——桌面 bin 与
+# Android 调试壳 example 共用
+name = "pygame_rs_dev"
+path = "src/lib.rs"
+
 [[bin]]
 # 产物名 = python（用户定夺：开发解释器的分发形态就是 python.exe——
-# pygame 全内置的 python 发行版；项目/仓库名 = pgpython）
+# pygame 全内置的 python 发行版；项目/仓库名 = pygame-rs-dev）
 name = "python"
 path = "src/main.rs"
+
+[[example]]
+# Android 调试壳（cdylib）：dialog 选文件运行（单文件 -c 形态）
+name = "android_host"
+path = "examples/android_host.rs"
+crate-type = ["cdylib"]
 
 [dependencies]
 # 核心库（绑定面 + 宿主）：pygame 全内置
 pygame-rs = { path = "../pygame-rs", features = ["gui", "physics2d", "physics3d"] }
 # 事件泵/混音器驱动（脚本直跑的游戏门帧循环用）
 starfish-pygame = { path = "../starfish/crates/starfish-pygame" }
-# 开发辅助（app_entry! 跨平台入口宏）
-starfish-std = { path = "../starfish/crates/starfish-std" }
+# 开发辅助（app_entry! 跨平台入口宏；we = Android android_main 装配）
+starfish-std = { path = "../starfish/crates/starfish-std", features = ["we"] }
 
 # RustPython 三件套（path 指向 pygame-rs 的 vendored——与 pygame-rs
 # 同源同版本合并单实例；features 必须与 pygame-rs 完全一致）
@@ -35,9 +47,10 @@ wasm-bindgen-futures = "=0.4.79"
 web-sys = { version = "=0.3.106", features = ["Window", "Location"] }
 starfish-io = { path = "../starfish/crates/starfish-io" }
 
-# examples = 纯 Python 脚本（python.exe examples/<名>.py 直跑）——
-# APK 壳（*_android.rs cdylib）2026-10-26 退役：真机链待通用 runner
-# 接管；模板 android/ 目录随之移除（需要时从 pygame-rs 历史取回）
+# ── 移动宿主（platform/mobile.rs 的 dialog 载荷通道；robius-file-picker
+#     实现，Android 构建前置 ANDROID_JAR 环境变量）──
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+starfish-dialog = { path = "../starfish/crates/starfish-dialog" }
 
 [profile.release]
 strip = true

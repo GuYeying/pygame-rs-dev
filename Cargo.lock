@@ -4043,6 +4043,7 @@ dependencies = [
  "rustpython-derive",
  "rustpython-pylib",
  "rustpython-vm",
+ "starfish-dialog",
  "starfish-io",
  "starfish-pygame",
  "starfish-std",
