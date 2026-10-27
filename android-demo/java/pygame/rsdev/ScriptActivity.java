@@ -101,11 +101,23 @@ public class ScriptActivity extends Activity implements SurfaceHolder.Callback {
         // = 像素干净，触摸/view/buffer 仍 1:1）。倍率在布局完成后按
         // root 实测尺寸计算（dm 在部分兼容层横屏下谎报竖屏值）
         if (fullscreen) {
-            // 全屏：view 铺满整屏，buffer 在 surfaceCreated 时钉为屏幕
-            // 实测尺寸——view/buffer/引擎表面三方同尺寸，纯 1:1 满屏
+            // 全屏（铺满拉伸形态）：view 铺满整屏 + 从左上角非等比拉伸
+            // w×h 的 view（buffer 钉逻辑尺寸）——满屏语义；egui 在此形态
+            // 下随画布拉伸 = 已知限制（不变形的等比居中形态可后续加旗标）
+            sv.setPivotX(0f);
+            sv.setPivotY(0f);
             root.addView(sv, new FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.MATCH_PARENT));
+            final SurfaceView fsv = sv;
+            final int fw = logicalW, fh = logicalH;
+            sv.post(new Runnable() {
+                @Override
+                public void run() {
+                    fsv.setScaleX(root.getWidth() / (float) fw);
+                    fsv.setScaleY(root.getHeight() / (float) fh);
+                }
+            });
         } else {
             root.addView(sv, new FrameLayout.LayoutParams(
                     logicalW, logicalH, Gravity.CENTER));
@@ -187,18 +199,10 @@ public class ScriptActivity extends Activity implements SurfaceHolder.Callback {
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
-        // 全屏 = 画布即屏幕：按 root 实测尺寸改写脚本 set_mode 的字面
-        // 尺寸（正道前奏——将来 std 屏幕尺寸接口落地后脚本自查自适应，
-        // 本壳层先行代劳），buffer 同步钉为屏幕尺寸——全程 1:1 满屏、
-        // 零变形、零映射（egui 布局/命中/触摸三方同系）
-        int sw = 800, sh = 600;
-        if (fullscreen) {
-            sw = Math.max(1, root.getWidth());
-            sh = Math.max(1, root.getHeight());
-            logicalW = sw;
-            logicalH = sh;
-            holder.setFixedSize(sw, sh);
-        }
+        // 全屏回退定案（2026-10-27 用户定夺）：画布即屏幕方案在真机上
+        // 仍复现"setmode 尺寸拉伸成全屏"——撤销，恢复最早的铺满拉伸
+        // 形态：buffer 钉逻辑尺寸（onCreate setFixedSize），view 铺满
+        // 整屏由合成器拉伸（egui 全屏变形 = 已知限制，非等比铺满语义）
         SdLog.log("surfaceCreated → attach（gen " + (activeGen + 1) + "） surface="
                 + logicalW + "x" + logicalH);
         myGen = ++activeGen;
@@ -207,9 +211,6 @@ public class ScriptActivity extends Activity implements SurfaceHolder.Callback {
             loadSent = true;
             String code = readAsset("scripts/" + scriptName);
             if (code != null) {
-                if (fullscreen) {
-                    code = patchSetModeSize(code, sw, sh);
-                }
                 SdLog.log("loadCode " + scriptName + "（" + code.length() + " B）");
                 PygameRsDev.loadCode(code);
             } else {
@@ -218,20 +219,6 @@ public class ScriptActivity extends Activity implements SurfaceHolder.Callback {
         }
     }
 
-    /** 全屏改写：第一处 set_mode 的字面宽高 → 屏幕实测尺寸（画布即
-     *  屏幕；未找到字面尺寸则原样返回，脚本侧自适应属后续接口职责） */
-    private String patchSetModeSize(String code, int w, int h) {
-        if (code == null) return code;
-        Matcher m = setModeMatch(code);
-        if (m != null) {
-            String patched = code.substring(0, m.start(1)) + w + ", " + h
-                    + code.substring(m.end(2));
-            SdLog.log("set_mode 尺寸改写 → " + w + "x" + h + "（画布即屏幕）");
-            return patched;
-        }
-        SdLog.log("set_mode 无字面尺寸——不改写（画布 " + w + "x" + h + "）");
-        return code;
-    }
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
