@@ -161,7 +161,9 @@ runBtn.addEventListener('click', async () => {
     status('运行 ' + p);
     return;
   }
-  location.search = '?script=' + encodeURIComponent(p);
+  const sp = new URLSearchParams(location.search); // 保留 script 以外的参数（如 argv=...）
+  sp.set('script', p);
+  location.search = '?' + sp.toString();
 });
 if (bootScript) {
   runBtn.textContent = '▶ 启动 ' + bootScript;

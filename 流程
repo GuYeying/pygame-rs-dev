@@ -1,0 +1,89 @@
+两条流程共用 `host.rs`（trait）+ `runtime.rs`（通用驱动），差异只在起点“拿载荷”和终点“退出语义”。按 .rs 文件被使用的先后顺序完整走一遍：
+
+## 一、电脑端（`python.exe <脚本> [参数]`）
+
+```
+main.rs                          # 进程入口：block_on 包住整个生命周期
+  │
+  ├─ platform/desktop.rs         # ① DesktopHost::from_env()
+  │     解析 std::env::args：
+  │     无参           → Mode::Repl（直入 repl_mode，不 return）
+  │     "-c <代码>"    → Mode::Eval
+  │     "serve [目录][端口]" → Mode::Serve（直入 serve.rs，不 return）
+  │     "<脚本.py> 余参" → Mode::File
+  │
+  ├─ serve.rs                    # （仅 serve 形态）TcpListener 静态服务，永不返回
+  │
+  ├─ host.rs                     # ② trait 接口（RunRequest{name, code, module_root}）
+  │     DesktopHost::acquire()   #    File：fs::read_to_string + canonicalize
+  │                              #    → module_root = 脚本父目录
+  │                              #    失败（缺失/是目录）→ Err → 退出码 2
+  │
+  ├─ runtime.rs                  # ③ runtime::run(&host)——平台零感知通用驱动
+  │     a. set_current_dir(module_root)      # cwd = main 所在目录（io 基准）
+  │     b. rpy::new_interpreter()            # RP genesis（pygame-rs/rpy/mod.rs）
+  │     c. set_argv(vm, 脚本名, host.args()) # sys.argv 透传（python 同语义）
+  │     d. rpy::install_module_finder(".")   # modfind.rs：std::fs 递归扫描
+  │                                          #    → 内存模块表 + meta_path Finder
+  │     e. testhost::preload_cjk()           # 字体预载（msyh→fonts/cjk 链）
+  │     f. 创建期旗标预扫描（源码含 TRANSPARENT/DIRECTX…即置位）
+  │     g. display::set_mode_ex(800×600, flags)  # starfish 建窗+GPU 装配
+  │     h. rpy::testhost::run_script_in(interp, code, name)  # 交给 pygame-rs
+  │
+  └─ pygame-rs/rpy/testhost.rs   # ④ run_script_in（解释器已由调用方持有）
+        a. 新 scope + registry::install(vm)   # pygame 全部原生模块注入
+        b. 帧桥注入（pygame.next_frame 可用）
+        c. vm.compile(code, Mode::Exec, name) # ⑤ 解析：源码 → 字节码
+        d. vm.run_code_obj(code, scope)       # ⑥ 调用：顶层执行（含 set_mode 等）
+        e. 入口探测：main 为 async fn → 调用得协程
+        f. 帧循环：event::pump → 协程 send（帧体）→ mixer::pump
+        │                                     #    → next_frame().await（帧拍）
+        g. StopIteration = 正常收尾；异常 = traceback → 返回 Err
+  │
+  └─ main.rs 收尾                # ⑦ 退出码：0 成功 / 1 运行错误 / 2 载荷不可得
+```
+
+## 二、Web 端（`http://127.0.0.1:8123/?script=xxx.py`）
+
+```
+web/index.html + python.js        # 页面：左控制面板 + canvas + 控制台镜像
+  │
+  ├─ 自动点火：?script= 存在 → init() 实例化 wasm
+  │     → wasm_bindgen(start) 触发 ↓
+  │
+  ├─ platform/web.rs              # ① web_start()：panic 钩子 + try_start()
+  │     try_start 分派（幂等，进程一次契约）：
+  │     a. ?script=<路径> → ScriptHost::from_url(url)
+  │     b. 无参 → 等待：页面 file input → f.text() → 导出函数
+  │        load_code(code) → CODE 槽 → CodeHost
+  │     c. 两者皆无 → 不启动（等待选择）
+  │
+  ├─ host.rs                      # ② 同一 trait：acquire()
+  │     ScriptHost：starfish_io::read(url)  # fetch（启动期一次）
+  │     CodeHost  ：直返代码串              # python -c 同语义
+  │     → RunRequest{name=url, code, module_root: None}   # web 无文件扫描
+  │
+  ├─ runtime.rs                   # ③ 同一份通用驱动（与桌面 ③ 完全相同）
+  │     差异：无 cwd 切换、无模块表扫描（module_root=None）
+  │     其余：genesis/argv/字体/旗标/建窗/run_script_in 一字不差
+  │
+  └─ pygame-rs/rpy/testhost.rs    # ④ 同一个 run_script_in
+        帧循环 → next_frame = rAF 桥（浏览器逐帧驱动）
+        io：pygame.io.read 在 web = 报错桩（同步 fetch 不可行——
+        资源预载表为预留位，wasm bundle 按你的指示延后）
+```
+
+## 三、传参 / 解析 / 调用一览
+
+| 环节 | 桌面 | Web |
+|--|--|--|
+| 参数来源 | `std::env::args` | URL 查询参数 `?script=` / 页面文件选择 |
+| 载荷解析 | desktop.rs：Mode 三形态分派 | web.rs：try_start 双通道分派 |
+| 载荷载体 | `RunRequest{name, code, module_root}`（同一结构） | 同左 |
+| argv | `set_argv(vm, 脚本名, 余参)` → `sys.argv` | `-c` 形态 `sys.argv[0]="<pygame-rs-dev -c>"` |
+| 源码→执行 | `vm.compile` → `vm.run_code_obj` | 同左（同一 run_script_in） |
+| 入口 | `async def main` 自动探测→协程 | 同左 |
+| 帧驱动 | pump → send → next_frame（桌面空 await） | 同左（next_frame = rAF 桥） |
+| 退出 | 退出码 0/1/2（process::exit） | 控制台日志（无退出码语义） |
+
+两个专属支线：`serve.rs`（`python.exe serve` → 静态服务 web/ 目录，解决 file:// CORS）与 `modfind.rs`（模块表，桌面扫描 `modules/`+脚本目录；web 端 module_root=None 跳过）。需要的话我可以把这份流程固化成 `pygame-rs-dev/reference/执行流程.md`。
