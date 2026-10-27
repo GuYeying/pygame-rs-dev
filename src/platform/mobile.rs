@@ -43,6 +43,23 @@ impl Host for MobileHost {
     }
 }
 
+/// 嵌入式停止请求（宿主 app 的 stop 接口置位；帧边界检查退出——
+/// 线程无法强杀，取消标志 = 唯一安全的"杀死"方式）
+static STOP_REQUESTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// 宿主 app 请求停止当前运行（帧边界生效）
+pub fn request_stop() {
+    STOP_REQUESTED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+pub(crate) fn stop_requested() -> bool {
+    STOP_REQUESTED.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+pub(crate) fn reset_stop() {
+    STOP_REQUESTED.store(false, std::sync::atomic::Ordering::SeqCst);
+}
+
 /// dialog 选文件 → 读取 → 运行（`python <文件>` 的移动映射）。
 ///
 /// 返回进程退出码：0 = 正常结束（含用户取消）；2 = dialog/读取失败；

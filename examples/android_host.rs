@@ -1,24 +1,121 @@
-//! pygame-rs-dev Android 调试壳（cdylib）：dialog 选文件 → 运行（-c 形态）。
+//! pygame-rs-dev Android 嵌入式调试 .so（cdylib）：**导出给原生 Android
+//! 开发者的接口面**——宿主 app 用自己的原生 UI 选文件，把 Surface 和
+//! 代码交给本运行时。
 //!
-//! 单文件运行调试的移动形态（与桌面 `python.exe game.py`、web 文件选择
-//! 通道同构）；多模块游戏随 pack 仓（bundle 嵌入模板，后续批次）。
+//! ## Kotlin 接入（约 20 行）
+//! ```kotlin
+//! object PygameRsDev {
+//!     init { System.loadLibrary("android_host") }
+//!     external fun attachSurface(surface: Surface)
+//!     external fun surfaceResized(w: Int, h: Int)
+//!     external fun detachSurface()
+//!     external fun setBaseDir(path: String)   // io 基准（游戏目录）
+//!     external fun loadCode(code: String)     // 运行（-c 形态）
+//!     external fun stop()                     // 帧边界收口
+//! }
+//! // SurfaceView 生命周期回调 → attachSurface/surfaceResized/detachSurface
+//! // 选好文件读入文本 → loadCode(text) → 全屏 pygame 运行
+//! ```
 //!
-//! 构建（家族链）：
-//!   cargo ndk -t arm64-v8a -o jniLibs --release --example android_host
-//!   （robius 前置：ANDROID_JAR 环境变量；APK 组装用
-//!    pygame-rs/scripts/build_apk.py android_host --dir ..）
+//! ## 契约
+//! - 游戏文件（.py + resources/）仅放**调用方 app 私有目录**（std::fs
+//!   直读 + set_base_dir 基准——零 SAF/裸接口处理）；
+//! - 进程一次契约：本 .so 一轮只跑一个程序，切换 = 调 stop + 重进；
+//! - 引擎跑在 .so 自起线程（不占宿主 UI 主线程）。
 //!
-//! 真机：安装 APK → 启动即弹文件选择 → 选 .py 运行（io 基准 = app
-//! 私有目录——资源随文件同目录部署）。
+//! 构建：cargo ndk -t arm64-v8a -o jniLibs -- build --release --example android_host
+//! （robius 前置：ANDROID_JAR 环境变量；APK 组装用
+//!  pygame-rs/scripts/build_apk.py android_host --dir ..）
 
-use pygame_rs_dev::platform::mobile;
+use starfish_we::embedded;
 
-async fn run() -> Result<(), String> {
-    let code = mobile::pick_and_run().await;
-    if code != 0 {
-        return Err(format!("退出码 {code}"));
-    }
-    Ok(())
+// ── libandroid.so 原生符号（尺寸读取用）────────────────────────
+extern "C" {
+    fn ANativeWindow_getWidth(window: *mut std::ffi::c_void) -> i32;
+    fn ANativeWindow_getHeight(window: *mut std::ffi::c_void) -> i32;
 }
 
-starfish_std::app_entry!(run());
+/// jstring → String（GetStringUTFChars/Release 直连；替换行为 lossy）
+///
+/// # Safety
+/// `env`/`s` 必须为有效 JNI 句柄。
+unsafe fn jstring_to_string(env: jni_sys::JNIEnv, s: jni_sys::jstring) -> String {
+    // jni-sys 函数表形参 = *mut JNIEnv（双层指针）——env 转可变传入
+    let env = env as *mut jni_sys::JNIEnv;
+    let get = (*(*env)).GetStringUTFChars.expect("GetStringUTFChars missing");
+    let ptr = get(env, s, std::ptr::null_mut());
+    let text = std::ffi::CStr::from_ptr(ptr).to_string_lossy().into_owned();
+    let release = (*(*env)).ReleaseStringUTFChars.expect("ReleaseStringUTFChars missing");
+    release(env, s, ptr);
+    text
+}
+
+#[no_mangle]
+pub extern "system" fn Java_pygame_rsdev_PygameRsDev_attachSurface(
+    env: jni_sys::JNIEnv,
+    _clazz: jni_sys::jclass,
+    surface: jni_sys::jobject,
+) {
+    unsafe { embedded::attach_surface(env as _, surface as _) };
+}
+
+#[no_mangle]
+pub extern "system" fn Java_pygame_rsdev_PygameRsDev_surfaceResized(
+    _env: jni_sys::JNIEnv,
+    _clazz: jni_sys::jclass,
+    width: i32,
+    height: i32,
+) {
+    embedded::surface_resized(width.max(0) as u32, height.max(0) as u32);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_pygame_rsdev_PygameRsDev_detachSurface(
+    _env: jni_sys::JNIEnv,
+    _clazz: jni_sys::jclass,
+) {
+    embedded::detach_surface();
+}
+
+#[no_mangle]
+pub extern "system" fn Java_pygame_rsdev_PygameRsDev_setBaseDir(
+    env: jni_sys::JNIEnv,
+    _clazz: jni_sys::jclass,
+    path: jni_sys::jstring,
+) {
+    let dir = unsafe { jstring_to_string(env, path) };
+    starfish_io::set_base_dir(&dir);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_pygame_rsdev_PygameRsDev_loadCode(
+    env: jni_sys::JNIEnv,
+    _clazz: jni_sys::jclass,
+    code: jni_sys::jstring,
+) {
+    let code = unsafe { jstring_to_string(env, code) };
+    // 引擎自起线程（不占宿主 UI 主线程）；block_on 驱动；帧边界响应 stop
+    std::thread::spawn(move || {
+        starfish_std::run_control::reset();
+        let host = pygame_rs_dev::platform::mobile::MobileHost {
+            name: "embedded.py".to_string(),
+            code,
+        };
+        let exit = starfish_std::app::block_on(async move {
+            pygame_rs_dev::runtime::run(&host).await
+        });
+        if exit != 0 {
+            starfish_std::debug::console_log(&format!(
+                "[pygame-rs-dev] 运行结束（退出码 {exit}）"
+            ));
+        }
+    });
+}
+
+#[no_mangle]
+pub extern "system" fn Java_pygame_rsdev_PygameRsDev_stop(
+    _env: jni_sys::JNIEnv,
+    _clazz: jni_sys::jclass,
+) {
+    starfish_std::run_control::request_stop();
+}
