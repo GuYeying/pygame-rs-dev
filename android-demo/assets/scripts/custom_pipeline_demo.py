@@ -38,9 +38,7 @@ fn vs_main(in: VIn) -> VOut {
 @fragment
 fn fs_main(in: VOut) -> @location(0) vec4<f32> {
     // SDF 圆盘 + 同心波纹（引擎内置绘制无法实现的逐像素程序化效果）
-    // 诊断期：圆盘中心钉在画布左上 (100,100)——全屏波纹若随动 = quad
-    // 本尊；不动 = 另有绘制源
-    let c = vec2<f32>(100.0, 100.0);
+    let c = vec2<f32>(400.0, 340.0);
     let d = distance(in.world, c);
     let r = 235.0;
     let edge = smoothstep(r, r - 5.0, d);
