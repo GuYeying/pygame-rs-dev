@@ -1,0 +1,55 @@
+name: build-linux
+
+# pygame-rs-dev Linux 可执行文件自动构建（手动触发：Actions 页
+# build-linux → Run workflow）。产物 = pygame-rs-dev-linux-x64 压缩包
+#（解释器 + 全量示例脚本 + modules 模板），见构建末尾的 artifact。
+#
+# 为什么不在 Windows 交叉编译：winit 链（smithay-client-toolkit 等）
+# 需要 Linux sysroot（pkg-config + CRT），得不偿失——ubuntu-latest
+# 原生构建零额外配置。release 铁律同 Android：RP debug genesis 必败。
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 系统依赖（winit=Wayland/X11、cpal=ALSA、gilrs=udev）
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential pkg-config \
+            libxkbcommon-dev libwayland-dev libxkbcommon-x11-dev \
+            libx11-dev libxcb1-dev libasound2-dev libudev-dev
+
+      - name: Rust 工具链（stable）
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 构建缓存
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo build --release --bin python
+        run: cargo build --release --bin python
+
+      - name: 产物自检（ELF 存在 + 动态链接可解析）
+        run: |
+          test -x target/release/python
+          file target/release/python
+          ldd target/release/python | head -8
+
+      - name: 打包（解释器 + 示例脚本 + modules 模板）
+        run: |
+          mkdir -p dist/examples dist/modules
+          cp target/release/python dist/
+          cp examples/*.py dist/examples/ 2>/dev/null || true
+          cp examples/modules/*.py dist/modules/ 2>/dev/null || true
+          tar -czf pygame-rs-dev-linux-x64.tar.gz -C dist .
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: pygame-rs-dev-linux-x64
+          path: pygame-rs-dev-linux-x64.tar.gz
+          retention-days: 90
