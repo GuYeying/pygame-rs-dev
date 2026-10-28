@@ -233,12 +233,11 @@ public class ScriptActivity extends Activity
         else if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) action = 2;
         else return false;
         // Activity 级坐标 = 全屏系——换算到 view 局部（脚本逻辑系）：
-        // 全屏 = 按铺满比例反算；非全屏 = 减 view 原点 + 除放大倍数
+        // 全屏 = 原始直通（核心定案：FULLSCREEN 旗标下画布 = 原生窗口
+        // 实测尺寸 = 触摸空间，三方天然同系，零映射）；非全屏 = 减
+        // view 原点 + 除放大倍数
         float x = e.getX(), y = e.getY();
-        if (fullscreen && root != null && root.getWidth() > 0) {
-            x = x * logicalW / root.getWidth();
-            y = y * logicalH / root.getHeight();
-        } else if (surfaceView != null) {
+        if (!fullscreen && surfaceView != null) {
             x = (x - surfaceView.getX()) / viewScale;
             y = (y - surfaceView.getY()) / viewScale;
         }

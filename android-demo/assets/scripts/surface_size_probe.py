@@ -11,11 +11,12 @@ import sys
 FULLSCREEN = 2  # 1 << 1（引擎 display 位定义；Python 常量面待开放）
 
 async def main():
-    w, h = 1024, 768
+    req_w, req_h = 1024, 768
     if len(sys.argv) >= 3:
-        w, h = int(sys.argv[-2]), int(sys.argv[-1])
-    screen = pygame.display.set_mode((w, h), FULLSCREEN)
-    print(f"[probe] set_mode = ({w}, {h}) FULLSCREEN；get_size = {screen.get_size()}")
+        req_w, req_h = int(sys.argv[-2]), int(sys.argv[-1])
+    screen = pygame.display.set_mode((req_w, req_h), FULLSCREEN)
+    sw, sh = screen.get_size()  # FULLSCREEN 下引擎以原生窗口实测尺寸为准
+    print(f"[probe] 请求 = ({req_w}, {req_h})；FULLSCREEN 生效 = ({sw}, {sh})")
     frame = 0
     pos = None
     while True:
@@ -26,8 +27,8 @@ async def main():
                 pos = (e.x, e.y)
         with screen.render() as r:
             r.fill((0, 0, 255))
-            r.rect((255, 255, 0), (0, 0, w, h), 6)
-            for cx, cy in ((8, 8), (w - 8, 8), (8, h - 8), (w - 8, h - 8)):
+            r.rect((255, 255, 0), (0, 0, sw, sh), 6)
+            for cx, cy in ((8, 8), (sw - 8, 8), (8, sh - 8), (sw - 8, sh - 8)):
                 r.circle((255, 255, 255), (cx, cy), 8)
             if pos:
                 r.circle((255, 0, 0), pos, 20)
