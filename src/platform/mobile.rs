@@ -22,6 +22,10 @@ pub struct MobileHost {
     pub name: String,
     /// 源码全文
     pub code: String,
+    /// 模块根（Some = 装载脚本模块表——"main 所在目录 = sys.path[0]"
+    /// 同语义，modules/ 等子目录按自然路径 import；None = 单文件零注入。
+    /// caller 取 io 基准目录/载荷所在目录传入）
+    pub module_root: Option<String>,
 }
 
 impl Host for MobileHost {
@@ -38,9 +42,43 @@ impl Host for MobileHost {
         Ok(RunRequest {
             name: self.name.clone(),
             code: self.code.clone(),
-            module_root: None, // 模块表：移动 v1 = 单文件/bundle；目录形态随 pack 仓
+            module_root: self.module_root.clone(),
         })
     }
+}
+
+/// 嵌入形态载荷运行（**导出壳统一收口**——JNI/wasm-bindgen 等语言边界
+/// 只做参数搬运，生命周期全在本接口）：自起 16MB 栈引擎线程（RP genesis
+/// 需要；不占宿主 UI 线程）→ reset stop → runtime::run → 兜底清理
+///（display/mixer 槽位是引擎线程的 thread_local，必须本线程清——音频
+/// 设备流 Drop 即停，漏了会"退脚本后声音还在"）→ 释放表面引用
+///（防 present-after-release；槽位已空 = no-op）。
+///
+/// 进程一次契约：一轮只跑一个程序；切换 = 宿主先 stop（帧边界收口）
+/// 再重进。module_root 传 io 基准目录（None = 单文件契约）。
+pub fn run_embedded_on_new_thread(name: String, code: String, module_root: Option<String>) {
+    std::thread::Builder::new()
+        .stack_size(16 * 1024 * 1024)
+        .spawn(move || {
+            starfish_std::debug::console_log("[pygame-rs-dev] 引擎线程启动");
+            starfish_std::run_control::reset();
+            let host = MobileHost { name, code, module_root };
+            let exit = starfish_std::app::block_on(async move {
+                crate::runtime::run(&host).await
+            });
+            if exit != 0 {
+                starfish_std::debug::console_log(&format!(
+                    "[pygame-rs-dev] 运行结束（退出码 {exit}）"
+                ));
+            }
+            starfish_pygame::display::quit();
+            starfish_pygame::mixer::quit();
+            starfish_std::debug::console_log(
+                "[pygame-rs-dev] 引擎线程收尾（display/mixer 已清）",
+            );
+            starfish_we::embedded::release_surface();
+        })
+        .expect("spawn engine thread");
 }
 
 /// 嵌入式停止请求（宿主 app 的 stop 接口置位；帧边界检查退出——
@@ -95,6 +133,11 @@ pub async fn pick_and_run() -> i32 {
     }
     let code = String::from_utf8_lossy(&bytes).into_owned();
     console_log(&format!("[pygame-rs-dev] 载荷 = {name}（dialog，{} B）", bytes.len()));
-    let host = MobileHost { name, code };
+    let host = MobileHost {
+        name,
+        code,
+        // SAF 选取文件无稳定磁盘目录（可虚拟化）——dialog 形态保持单文件
+        module_root: None,
+    };
     crate::runtime::run(&host).await
 }

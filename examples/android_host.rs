@@ -231,6 +231,10 @@ fn android_main(app: android_activity::AndroidApp) {
     let host = pygame_rs_dev::platform::mobile::MobileHost {
         name: name.to_string(),
         code,
+        // main.py 就在基准目录——模块根同目录（脚本可 import 同级
+        // modules/ 等；未设基准 = None 单文件语义）
+        module_root: starfish_io::base_dir()
+            .map(|p| p.to_string_lossy().into_owned()),
     };
     dlog("3 runtime::run start（android_main 线程——事件轮询必须在此线程）");
     // 直接在 android_main 线程上 block_on 驱动（android-activity 的事件
@@ -310,36 +314,16 @@ pub extern "system" fn Java_pygame_rsdev_PygameRsDev_loadCode(
     code: jni_sys::jstring,
 ) {
     let code = unsafe { jstring_to_string(env, code) };
-    // 引擎自起线程（不占宿主 UI 主线程）；16MB 大栈（RP genesis 需要——
-    // 与独立形态同参数）；block_on 驱动；帧边界响应 stop
-    std::thread::Builder::new()
-        .stack_size(16 * 1024 * 1024)
-        .spawn(move || {
-            starfish_std::debug::console_log("[pygame-rs-dev] 引擎线程启动");
-            starfish_std::run_control::reset();
-            let host = pygame_rs_dev::platform::mobile::MobileHost {
-                name: "embedded.py".to_string(),
-                code,
-            };
-            let exit = starfish_std::app::block_on(async move {
-                pygame_rs_dev::runtime::run(&host).await
-            });
-            if exit != 0 {
-                starfish_std::debug::console_log(&format!(
-                    "[pygame-rs-dev] 运行结束（退出码 {exit}）"
-                ));
-            }
-            // 防御性收尾（正常路径 testhost 已 quit；早退分支兜底）：
-            // display/混音器槽位是本线程的 thread_local——必须在本线程
-            // 清理（音频设备流 Drop 即停，漏了会"退脚本后声音还在"）
-            starfish_pygame::display::quit();
-            starfish_pygame::mixer::quit();
-            starfish_std::debug::console_log("[pygame-rs-dev] 引擎线程收尾（display/mixer 已清）");
-            // 引擎已完全停止 → 窗口引用物理释放此刻安全（防
-            // present-after-release；槽位已空 = no-op）
-            embedded::release_surface();
-        })
-        .expect("spawn engine thread");
+    // 语言边界 = 纯参数搬运；引擎线程生命周期/收口全在库接口
+    //（run_embedded_on_new_thread——未来导出壳零复制接入）
+    pygame_rs_dev::platform::mobile::run_embedded_on_new_thread(
+        "embedded.py".to_string(),
+        code,
+        // 模块根 = io 基准目录（setBaseDir 先于 loadCode——壳已把
+        // scripts/modules 落盘其下）：脚本可 import modules.xxx。
+        // 未调 setBaseDir = None，单文件契约原样保留
+        starfish_io::base_dir().map(|p| p.to_string_lossy().into_owned()),
+    );
 }
 
 /// 绑定宿主 Context（宿主在最早入口调一次；包装层守卫防二次初始化——

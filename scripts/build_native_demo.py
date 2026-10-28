@@ -90,6 +90,25 @@ def main():
             (scripts_dir / py.name).write_bytes(py.read_bytes())
             count += 1
     print(f"[OK] 打包脚本 {count} 个")
+    # 1b) 模块文件夹收集（examples/modules/ → assets/modules/，递归保留
+    # 子包结构）：多文件工程约定（与桌面 mod_demo 同构）——脚本侧
+    # `import modules.xxx`；APK 侧由 ScriptActivity.prepareFiles 落盘
+    # io 基准目录，模块表装载后自然路径可达
+    mods_dir = ASSETS / "modules"
+    if mods_dir.is_dir():
+        shutil.rmtree(mods_dir)
+    mods_dir.mkdir(parents=True, exist_ok=True)
+    mcount = 0
+    for src in SCRIPT_SOURCES:
+        msrc = src / "modules"
+        if msrc.is_dir():
+            for py in sorted(msrc.rglob("*.py")):
+                rel = py.relative_to(msrc)
+                dst = mods_dir / rel
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                dst.write_bytes(py.read_bytes())
+                mcount += 1
+    print(f"[OK] 打包模块 {mcount} 个")
 
     # 2) 交叉编译 .so（release 铁律）
     so_name = "libandroid_host.so"

@@ -168,13 +168,27 @@ public class ScriptActivity extends Activity implements SurfaceHolder.Callback {
     private int myGen = 0;
 
     /** assets/scripts/*.py → filesDir/scripts/（io 基准内的就近副本；
-     *  字体 assets/fonts/cjk.ttf 存在才拷——缺省走系统 Noto 兜底） */
+     *  assets/modules/* → filesDir/modules/（多文件工程的模块——脚本
+     *  import modules.xxx；嵌套子目录随包保留）；字体 assets/fonts/cjk.ttf
+     *  存在才拷——缺省走系统 Noto 兜底） */
     private void prepareFiles() {
         try {
             File dir = new File(getFilesDir(), "scripts");
             dir.mkdirs();
             for (String n : getAssets().list("scripts")) {
                 copyAsset("scripts/" + n, new File(dir, n));
+            }
+            File mdir = new File(getFilesDir(), "modules");
+            mdir.mkdirs();
+            String[] mods = getAssets().list("modules");
+            if (mods != null) {
+                for (String n : mods) {
+                    // 子包目录跳过（v1 平铺约定——嵌套目录非资产文件，
+                    // copyAsset 会抛 IO 异常连带跳过后续拷贝）
+                    String[] nested = getAssets().list("modules/" + n);
+                    if (nested != null && nested.length > 0) continue;
+                    copyAsset("modules/" + n, new File(mdir, n));
+                }
             }
             String[] fonts = getAssets().list("fonts");
             if (fonts != null && fonts.length > 0) {
