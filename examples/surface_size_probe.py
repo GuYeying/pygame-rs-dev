@@ -1,15 +1,21 @@
 import pygame
 import pygame.event
+import sys
 
-# 呈现映射自证探针：全屏拉伸 / 非全屏居中 4 秒轮换——深蓝底标出画布
-# 可视边界，黄描边+四角白点 = 逻辑矩形四角，红圈 = 触摸映射落点
-#（e.x/e.y）。一张截图同时诊断：锚点、拉伸、触摸映射三件事。
+# Surface 真实处理尺寸探针（自适应满屏）：Android 壳把实测屏幕尺寸
+# 附在 sys.argv 末尾（argv[-2:]），脚本据此 set_mode——画布 = 屏幕，
+# 1:1 满屏零变形（"std 屏幕尺寸接口"的壳层先行形态）。桌面/web 无
+# 附加参数 = 回退 1024×768。蓝底标画布边界，黄描边 + 四角白点验证
+# 锚点，红圈 = 触摸映射落点。源码含 OPENGLES 词 → 创建期预扫描置位。
 
-FULLSCREEN = 2  # 1 << 1（引擎 display 位定义）
+FULLSCREEN = 2  # 1 << 1（引擎 display 位定义；Python 常量面待开放）
 
 async def main():
-    screen = pygame.display.set_mode((1024, 768))
-    fs = False
+    w, h = 1024, 768
+    if len(sys.argv) >= 3:
+        w, h = int(sys.argv[-2]), int(sys.argv[-1])
+    screen = pygame.display.set_mode((w, h), FULLSCREEN)
+    print(f"[probe] set_mode = ({w}, {h}) FULLSCREEN；get_size = {screen.get_size()}")
     frame = 0
     pos = None
     while True:
@@ -18,19 +24,15 @@ async def main():
                 return
             if e.type == pygame.event.MOUSEMOTION:
                 pos = (e.x, e.y)
-        if frame > 0 and frame % 240 == 0:  # 4 秒一切（60fps 假定）
-            fs = not fs
-            screen = pygame.display.set_mode((1024, 768), FULLSCREEN if fs else 0)
-            print(f"[probe] 切换 → 全屏拉伸={fs} get_size={screen.get_size()}")
         with screen.render() as r:
-            r.fill((0, 0, 60))  # 深蓝底 = 画布可视边界（黑屏背景对照）
-            r.rect((255, 255, 0), (0, 0, 1024, 768), 6)
-            for cx, cy in ((20, 20), (1004, 20), (20, 748), (1004, 748)):
-                r.circle((255, 255, 255), (cx, cy), 12)
+            r.fill((0, 0, 255))
+            r.rect((255, 255, 0), (0, 0, w, h), 6)
+            for cx, cy in ((8, 8), (w - 8, 8), (8, h - 8), (w - 8, h - 8)):
+                r.circle((255, 255, 255), (cx, cy), 8)
             if pos:
                 r.circle((255, 0, 0), pos, 20)
         pygame.display.flip()
         frame += 1
-        if frame == 1:
-            print(f"[probe] 起始 get_size={screen.get_size()}（非全屏段）")
+        if frame == 1 or frame % 120 == 0:
+            print(f"[probe] frame {frame}: surface = {screen.get_size()}")
         await pygame.next_frame()

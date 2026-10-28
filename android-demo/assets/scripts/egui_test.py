@@ -8,6 +8,7 @@
 #      不喂则 egui 无输入——捕获行为在数据流层完全可见）；
 #   ③ 嵌套布局 with 语法——`with ui.horizontal():`；
 #   ④ 落屏时机 = flip 的叠加阶段（恒在游戏内容之上，结构保证）。
+import sys
 import pygame
 import pygame_gui as egui
 
@@ -70,9 +71,12 @@ async def main():
     # FULLSCREEN 位（1 << 1，引擎 display 位定义；Python 常量面未开放）：
     # Android 宿主布局拉伸铺满整屏 + 触摸按比例反算——egui 全屏联测
     FULLSCREEN = 2
-    screen = pygame.display.set_mode((800, 600), FULLSCREEN)
+    w, h = 800, 600
+    if len(sys.argv) >= 3:   # Android 壳附加的实测屏幕尺寸（argv[-2:]）
+        w, h = int(sys.argv[-2]), int(sys.argv[-1])
+    screen = pygame.display.set_mode((w, h), FULLSCREEN)
     cjk = pygame.font.Font("cjk", 20)
-    game_state = {"size": [800, 600]}
+    game_state = {"size": [w, h]}
     _fail = []
 
     def st(name, cond):

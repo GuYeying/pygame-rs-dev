@@ -45,7 +45,16 @@ pub async fn run<H: Host>(host: &H) -> i32 {
     log(&format!("[{name}] ①genesis 开始"));
     let interp = rpy::new_interpreter();
     log(&format!("[{name}] ①解释器就绪 {}ms", t_rp.ms()));
-    interp.enter(|vm| set_argv(vm, &req.name, &host.args())); // python 标准 sys.argv
+    // sys.argv：宿主参数 + Android 追加实测屏幕尺寸（外部窗口 attach
+    // 时记录）——脚本 set_mode 自适应屏幕的取数通道（"std 屏幕尺寸
+    // 接口"的壳层先行形态；桌面/web 不追加，argv 保持 CLI 原样）
+    let mut argv: Vec<String> = host.args();
+    #[cfg(target_os = "android")]
+    if let Some((ew, eh)) = starfish_we::embedded::external_size() {
+        argv.push(ew.to_string());
+        argv.push(eh.to_string());
+    }
+    interp.enter(|vm| set_argv(vm, &req.name, &argv)); // python 标准 sys.argv
     // 游戏脚本模块加载（python 行为：唯一解析根 = main 所在目录——
     // sys.path[0] 同语义）。modules/、resources/ 仅为打包便利文件夹，
     // 无导入特权：加载 modules 下模块 = import modules.xxx（自然相对
