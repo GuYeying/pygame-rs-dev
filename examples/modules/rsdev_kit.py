@@ -42,6 +42,14 @@ def state():
     return pygame.render.camera_state()
 
 
+def fit():
+    """呈现拟合矩阵（NDC 域）——**自管相机（write_buffer 直写矩阵的
+    自绘管线）专用**：引擎无法拦截组合 letterbox，自绘内容左乘本矩阵
+    即与主绘制同一映射。桌面/全屏恒等，Android 窗口化收进居中画布。
+    帧内快照语义（每帧重取）"""
+    return pygame.render.present_fit()
+
+
 # ── 矩阵链（blit_transform 的变换参数；可读名替代手写 .mul_mat4 链）──
 
 def pos(x, y, z=0.0):

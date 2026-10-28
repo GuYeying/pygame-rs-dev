@@ -132,9 +132,13 @@ async def main():
         # 动态几何写入路径验证（update_mesh 每帧就地更新——内容不变
         # 零视觉风险；容量契约：顶点数 ≤ 建时数量）
         ac.update_mesh(mesh, verts)
-        # 自管相机：矩阵直写各自 buf（Mat4 特判；零全局相机参与）
-        ac.write_buffer(cam_buf, cam_ortho.mvp())
-        ac.write_buffer(cam_buf3, cam3d.mvp())
+        # 自管相机：矩阵直写各自 buf（Mat4 特判；零全局相机参与）。
+        # 呈现对齐：自写矩阵引擎无法拦截组合 letterbox——左乘
+        # present_fit（帧内快照；桌面/全屏恒等，Android 窗口化把自绘
+        # 内容收进居中画布，与主绘制/物理调试线同一映射）
+        fit = pygame.render.present_fit()
+        ac.write_buffer(cam_buf, fit.mul_mat4(cam_ortho.mvp()))
+        ac.write_buffer(cam_buf3, fit.mul_mat4(cam3d.mvp()))
 
         with screen.render() as t:
             if frame == 0:
