@@ -262,6 +262,9 @@ pub extern "system" fn Java_pygame_rsdev_PygameRsDev_surfaceResized(
     height: i32,
 ) {
     embedded::surface_resized(width.max(0) as u32, height.max(0) as u32);
+    // std 屏幕注册表同步（"std 屏幕尺寸接口"的取数通道——脚本/绑定层
+    // 经此自适应 set_mode；写入方 = 壳：同时握 std/we 两侧依赖）
+    starfish_std::screen::set_screen_size(width.max(0) as u32, height.max(0) as u32);
 }
 
 #[no_mangle]
