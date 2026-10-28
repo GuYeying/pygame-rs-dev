@@ -1,14 +1,12 @@
 package pygame.rsdev;
 
 import android.app.Activity;
-import android.graphics.SurfaceTexture;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
-import android.view.TextureView;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -26,12 +24,11 @@ import java.util.regex.Pattern;
  *  尺寸定约（demo 层自决，引擎零改动）：
  *  - 非全屏：SurfaceView，buffer 钉逻辑尺寸，整数倍放大居中——
  *    view/buffer/引擎表面三方 1:1（get_size/egui/触摸天然一致）；
- *  - FULLSCREEN 旗标：**TextureView 铺满整屏**——buffer 跟随 view
- *    （满屏），引擎表面初始 = 外部窗口实测尺寸（external_size），
- *    脚本 set_mode 后 GLES 缩放铺满（既定满屏语义）。选 TextureView
- *    而非 SurfaceView：ANCO 兼容层对 SurfaceView 的合成定位不受应用
- *    控制（画布偏移/溢出，真机截图实证）；TextureView = 普通 view
- *    纹理，位置缩放全由应用掌控。
+ *  - FULLSCREEN 旗标：SurfaceView 铺满整屏（不钉 buffer），引擎表面
+ *    初始 = 外部窗口实测尺寸（external_size），脚本 set_mode 后 GLES
+ *    缩放铺满——满屏但内容随拉伸变形 = 既定语义。全屏 TextureView/
+ *    画布即屏幕两方案已实验：ANCO 兼容层对 SurfaceView 合成定位、
+ *    应用窗口摆放均不受应用控制（真机截图实证），存档于调试记录。
  *
  *  接线次序（契约：先 attach 后 load——引擎建窗时窗口必须已就位）：
  *  onCreate → 预扫描定布局 + setBaseDir/setLogDir
@@ -41,7 +38,7 @@ import java.util.regex.Pattern;
  *  返回键 → stop()（帧边界收口）→ 返回选择页
  */
 public class ScriptActivity extends Activity
-        implements SurfaceHolder.Callback, TextureView.SurfaceTextureListener {
+        implements SurfaceHolder.Callback {
     private static final Pattern SET_MODE =
             Pattern.compile("set_mode\\s*\\(\\s*\\(\\s*(\\d+)\\s*,\\s*(\\d+)");
     /** 全屏判定 = FULLSCREEN 作为 set_mode 的实参（同行匹配；注释行
@@ -55,7 +52,6 @@ public class ScriptActivity extends Activity
     private int viewScale = 1;
     private FrameLayout root;
     private SurfaceView surfaceView;
-    private volatile Surface textureSurface;
     /** attach 代数（进程级）：销毁回调只在本场仍是当前场时生效——
      *  换场重叠期旧场销毁晚到，会连坐新场窗口 */
     private static int activeGen = 0;
@@ -95,23 +91,20 @@ public class ScriptActivity extends Activity
 
         root = new FrameLayout(this);
         root.setBackgroundColor(0xFF000000);
+        SurfaceView sv = new SurfaceView(this);
+        surfaceView = sv;
+        sv.getHolder().addCallback(this);
         if (fullscreen) {
-            // 全屏：TextureView 铺满整屏（buffer 跟随 view），引擎表面
-            // 初始 = 外部窗口实测尺寸（external_size），脚本 set_mode 后
-            // GLES 缩放铺满——位置缩放全由应用掌控，绕开 ANCO 对
-            // SurfaceView 的合成定位怪癖（画布偏移/溢出，真机截图实证）
-            TextureView tv = new TextureView(this);
-            tv.setOpaque(true);
-            tv.setSurfaceTextureListener(this);
-            root.addView(tv, new FrameLayout.LayoutParams(
+            // 全屏（铺满拉伸形态，真机验收版）：view 铺满整屏且不钉
+            // buffer——ANCO 合成器把 SurfaceView 铺满整个显示屏，引擎
+            // 表面（壳按外部窗口实测尺寸初始化）经脚本 set_mode 缩放后
+            // 由 GLES 缩放铺满。egui/内容随画布拉伸 = 已知限制）
+            root.addView(sv, new FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.MATCH_PARENT));
         } else {
-            SurfaceView sv = new SurfaceView(this);
-            surfaceView = sv;
-            sv.getHolder().addCallback(this);
-            // buffer 钉死脚本逻辑尺寸 + 整数倍放大居中：view/buffer/
-            // 引擎表面三方 1:1（get_size/egui/触摸天然一致）
+            // 非全屏：buffer 钉死脚本逻辑尺寸 + 整数倍放大居中——
+            // view/buffer/引擎表面三方 1:1（get_size/egui/触摸天然一致）
             sv.getHolder().setFixedSize(logicalW, logicalH);
             root.addView(sv, new FrameLayout.LayoutParams(
                     logicalW, logicalH, Gravity.CENTER));
@@ -216,43 +209,6 @@ public class ScriptActivity extends Activity
         SdLog.log("surfaceDestroyed → stop + detach");
         PygameRsDev.stop();
         PygameRsDev.detachSurface(holder.getSurface());
-    }
-
-    // ── TextureView 路径（全屏）──────────────────────────────────
-    @Override
-    public void onSurfaceTextureAvailable(SurfaceTexture st, int width, int height) {
-        SdLog.log("textureAvailable " + width + "x" + height
-                + "（gen " + (activeGen + 1) + "）");
-        myGen = ++activeGen;
-        textureSurface = new Surface(st);
-        PygameRsDev.attachSurface(textureSurface);
-        loadOnce();
-    }
-
-    @Override
-    public void onSurfaceTextureSizeChanged(SurfaceTexture st, int width, int height) {
-        SdLog.log("textureSizeChanged " + width + "x" + height);
-        PygameRsDev.surfaceResized(width, height);
-    }
-
-    @Override
-    public boolean onSurfaceTextureDestroyed(SurfaceTexture st) {
-        if (myGen == activeGen) {
-            SdLog.log("textureDestroyed → stop + detach");
-            PygameRsDev.stop();
-            PygameRsDev.detachSurface(textureSurface);
-        } else {
-            SdLog.log("textureDestroyed 陈旧——忽略");
-        }
-        if (textureSurface != null) {
-            textureSurface.release();
-            textureSurface = null;
-        }
-        return true; // 允许释放 SurfaceTexture（detach 已对消引用）
-    }
-
-    @Override
-    public void onSurfaceTextureUpdated(SurfaceTexture st) {
     }
 
     // ── 共用：attach 后的一次性加载 ─────────────────────────────
