@@ -7,8 +7,10 @@
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="pygame.rsdev"
-    android:versionCode="2"
-    android:versionName="0.2.0">
+    android:versionCode="__VERSION_CODE__"
+    android:versionName="__VERSION_NAME__">
+    <!-- 版本占位符由 build_native_demo.py 按构建时刻注入——恒定
+         versionCode 会让部分 ROM 的覆盖安装静默跳过（真机教训） -->
 
     <!-- minSdk 26：cpal AAudio 硬性下限 -->
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36" />

@@ -166,11 +166,21 @@ def main():
     if not dex.is_file():
         sys.exit("[FAIL] classes.dex 未产出")
 
-    # 5) aapt2 link（-A assets 打进资源表）
+    # 5) aapt2 link（-A assets 打进资源表）。versionCode/Name 随构建
+    #    注入（manifest 占位符替换——aapt2 flag 不覆盖 manifest 显式
+    #    属性，实测无效）：恒定 versionCode 会让部分 ROM 的覆盖安装
+    #    静默跳过——提示"安装成功"实际系统保留旧应用（真机教训：文件
+    #    新/装了/日期对，三样都真，跑的还是旧 .so 旧脚本）
     print("=== 5/7 aapt2 link ===")
     WORK.mkdir(parents=True, exist_ok=True)
+    ver_code = __import__("time").strftime("%m%d%H%M%S")  # int32 安全（10 位）
+    mtext = (DEMO / "AndroidManifest.xml").read_text(encoding="utf-8")
+    mtext = mtext.replace("__VERSION_CODE__", ver_code).replace(
+        "__VERSION_NAME__", build_id)
+    manifest = WORK / "AndroidManifest.xml"
+    manifest.write_text(mtext, encoding="utf-8")
     base_apk = WORK / "base.apk"
-    sh([str(bt / "aapt2.exe"), "link", "--manifest", str(DEMO / "AndroidManifest.xml"),
+    sh([str(bt / "aapt2.exe"), "link", "--manifest", str(manifest),
         "-I", str(jar), "-A", str(ASSETS), "-o", str(base_apk)])
 
     # 6) 组装（dex + so；DEFLATED + 正斜杠条目）
