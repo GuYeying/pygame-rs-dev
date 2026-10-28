@@ -1,12 +1,14 @@
 package pygame.rsdev;
 
 import android.app.Activity;
+import android.graphics.SurfaceTexture;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.TextureView;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -19,31 +21,31 @@ import java.io.InputStream;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** 脚本运行页：SurfaceView 挂引擎（**宿主布局 letterbox / 拉伸全屏**）。
+/** 脚本运行页：surface 挂引擎（**宿主布局 letterbox / 拉伸全屏**）。
  *
- *  尺寸定约（demo 层自决，引擎零改动）：onCreate 读脚本文本正则预扫描
- *  set_mode 尺寸 → `holder.setFixedSize(w, h)` 钉死 buffer = 脚本逻辑
- *  尺寸（get_size/egui/触摸三方天然 1:1，无需任何映射）：
- *  - 非全屏：view = w×h 黑底居中（布局 letterbox）；
- *  - FULLSCREEN 旗标：view 铺满整屏 + pivot(0,0) 矩阵缩放把 w×h 的
- *    view 拉伸到满屏（非等比，buffer 整体即画布，无锚点歧义），
- *    触摸按缩放比反算回逻辑坐标。
- *  动态尺寸扫描失败回退 800×600。
+ *  尺寸定约（demo 层自决，引擎零改动）：
+ *  - 非全屏：SurfaceView，buffer 钉逻辑尺寸，整数倍放大居中——
+ *    view/buffer/引擎表面三方 1:1（get_size/egui/触摸天然一致）；
+ *  - FULLSCREEN 旗标：**TextureView 铺满整屏**——buffer 跟随 view
+ *    （满屏），引擎表面初始 = 外部窗口实测尺寸（external_size），
+ *    脚本 set_mode 后 GLES 缩放铺满（既定满屏语义）。选 TextureView
+ *    而非 SurfaceView：ANCO 兼容层对 SurfaceView 的合成定位不受应用
+ *    控制（画布偏移/溢出，真机截图实证）；TextureView = 普通 view
+ *    纹理，位置缩放全由应用掌控。
  *
  *  接线次序（契约：先 attach 后 load——引擎建窗时窗口必须已就位）：
- *  onCreate → 预扫描定布局 + setFixedSize + setBaseDir/setLogDir
- *  surfaceCreated → attachSurface（一次）→ loadCode
- *  surfaceChanged → surfaceResized（恒报固定逻辑尺寸）
- *  surfaceDestroyed → detachSurface（比对清除）
+ *  onCreate → 预扫描定布局 + setBaseDir/setLogDir
+ *  surface 就绪 → attachSurface（一次）→ loadCode
+ *  尺寸变化 → surfaceResized；销毁 → stop() + detachSurface
  *  onTouchEvent → injectTouch（MotionEvent 编码 → 引擎编码换算）
  *  返回键 → stop()（帧边界收口）→ 返回选择页
  */
-public class ScriptActivity extends Activity implements SurfaceHolder.Callback {
+public class ScriptActivity extends Activity
+        implements SurfaceHolder.Callback, TextureView.SurfaceTextureListener {
     private static final Pattern SET_MODE =
             Pattern.compile("set_mode\\s*\\(\\s*\\(\\s*(\\d+)\\s*,\\s*(\\d+)");
-    /** 全屏判定 = FULLSCREEN 作为 set_mode 的实参（同行匹配——元组
-     *  右括号会截断 [^)]*，[^)] 版曾把元组形态的调用漏判）。注释提及
-     *  全屏字样但未在 set_mode 行内使用 = 不命中 */
+    /** 全屏判定 = FULLSCREEN 作为 set_mode 的实参（同行匹配；注释行
+     *  跳过——probe 头注释含完整 set_mode 字面，曾把注释当调用） */
     private static final Pattern SET_MODE_FULLSCREEN =
             Pattern.compile("set_mode\\s*\\(.*FULLSCREEN");
     private boolean loadSent = false;
@@ -53,9 +55,9 @@ public class ScriptActivity extends Activity implements SurfaceHolder.Callback {
     private int viewScale = 1;
     private FrameLayout root;
     private SurfaceView surfaceView;
-    /** attach 代数（进程级）：surfaceDestroyed 只在本场仍是当前场时
-     *  detach——换场重叠期旧场销毁晚到，陈旧 detach 会把新场窗口清掉
-     *  （引擎永不收口/黑屏；Rust 侧指针比对在 ANCO 不可靠，守卫前置） */
+    private volatile Surface textureSurface;
+    /** attach 代数（进程级）：销毁回调只在本场仍是当前场时生效——
+     *  换场重叠期旧场销毁晚到，会连坐新场窗口 */
     private static int activeGen = 0;
     private int myGen = 0;
 
@@ -90,39 +92,24 @@ public class ScriptActivity extends Activity implements SurfaceHolder.Callback {
 
         root = new FrameLayout(this);
         root.setBackgroundColor(0xFF000000);
-        SurfaceView sv = new SurfaceView(this);
-        surfaceView = sv;
-        sv.getHolder().addCallback(this);
-        // buffer 钉死脚本逻辑尺寸（与 view 缩放/布局解耦——引擎表面、
-        // buffer、脚本坐标系三方恒 1:1）。全屏例外：不钉——buffer 跟随
-        // view（满屏），引擎表面由壳按外部窗口实测尺寸初始化，脚本
-        // set_mode 后 GLES 缩放铺满（既定满屏语义）
-        if (!fullscreen) {
-            sv.getHolder().setFixedSize(logicalW, logicalH);
-        }
-        // view 自适应放大：逻辑尺寸的整数倍铺到屏幕上限（800×600 在
-        // 高分屏上太小——用户可感知的"egui/画面放大"即来自此；整数倍
-        // = 像素干净，触摸/view/buffer 仍 1:1）。倍率在布局完成后按
-        // root 实测尺寸计算（dm 在部分兼容层横屏下谎报竖屏值）
         if (fullscreen) {
-            // 全屏（铺满拉伸形态）：view 铺满整屏 + 从左上角非等比拉伸
-            // w×h 的 view（buffer 钉逻辑尺寸）——满屏语义；egui 在此形态
-            // 下随画布拉伸 = 已知限制（不变形的等比居中形态可后续加旗标）
-            sv.setPivotX(0f);
-            sv.setPivotY(0f);
-            root.addView(sv, new FrameLayout.LayoutParams(
+            // 全屏：TextureView 铺满整屏（buffer 跟随 view），引擎表面
+            // 初始 = 外部窗口实测尺寸（external_size），脚本 set_mode 后
+            // GLES 缩放铺满——位置缩放全由应用掌控，绕开 ANCO 对
+            // SurfaceView 的合成定位怪癖（画布偏移/溢出，真机截图实证）
+            TextureView tv = new TextureView(this);
+            tv.setOpaque(true);
+            tv.setSurfaceTextureListener(this);
+            root.addView(tv, new FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.MATCH_PARENT));
-            final SurfaceView fsv = sv;
-            final int fw = logicalW, fh = logicalH;
-            sv.post(new Runnable() {
-                @Override
-                public void run() {
-                    fsv.setScaleX(root.getWidth() / (float) fw);
-                    fsv.setScaleY(root.getHeight() / (float) fh);
-                }
-            });
         } else {
+            SurfaceView sv = new SurfaceView(this);
+            surfaceView = sv;
+            sv.getHolder().addCallback(this);
+            // buffer 钉死脚本逻辑尺寸 + 整数倍放大居中：view/buffer/
+            // 引擎表面三方 1:1（get_size/egui/触摸天然一致）
+            sv.getHolder().setFixedSize(logicalW, logicalH);
             root.addView(sv, new FrameLayout.LayoutParams(
                     logicalW, logicalH, Gravity.CENTER));
             final SurfaceView fsv = sv;
@@ -170,8 +157,6 @@ public class ScriptActivity extends Activity implements SurfaceHolder.Callback {
                 + " ScriptActivity.onCreate " + logicalW + "x" + logicalH);
     }
 
-    /** 脚本文本预扫描：第一处 set_mode((w, h)) 的字面尺寸；无匹配 =
-     *  800×600 兜底（动态尺寸场景，demo 层可接受）。 */
     /** 第一处有效（非注释行）set_mode 匹配：'#' 出现在匹配位置之前
      *  （同行）= 注释行跳过——probe 头注释含完整 set_mode 字面，曾把
      *  注释里的数字当调用改写，真实调用纹丝不动 → 画布左上角对齐 */
@@ -201,33 +186,17 @@ public class ScriptActivity extends Activity implements SurfaceHolder.Callback {
         return new int[]{w, h};
     }
 
+    // ── SurfaceView 路径（非全屏）────────────────────────────────
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
-        // 全屏回退定案（2026-10-27 用户定夺）：画布即屏幕方案在真机上
-        // 仍复现"setmode 尺寸拉伸成全屏"——撤销，恢复最早的铺满拉伸
-        // 形态：buffer 钉逻辑尺寸（onCreate setFixedSize），view 铺满
-        // 整屏由合成器拉伸（egui 全屏变形 = 已知限制，非等比铺满语义）
-        SdLog.log("surfaceCreated → attach（gen " + (activeGen + 1) + "） surface="
-                + logicalW + "x" + logicalH);
+        SdLog.log("surfaceCreated → attach（gen " + (activeGen + 1) + "）");
         myGen = ++activeGen;
         PygameRsDev.attachSurface(holder.getSurface());
-        if (!loadSent) {
-            loadSent = true;
-            String code = readAsset("scripts/" + scriptName);
-            if (code != null) {
-                SdLog.log("loadCode " + scriptName + "（" + code.length() + " B）");
-                PygameRsDev.loadCode(code);
-            } else {
-                SdLog.log("loadCode 失败：asset 缺失 " + scriptName);
-            }
-        }
+        loadOnce();
     }
-
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        // 直报实际表面尺寸：窗口化 = setFixedSize 的逻辑尺寸；全屏 =
-        // view 尺寸（buffer 未钉，跟随 view 满屏）
         SdLog.log("surfaceChanged " + width + "x" + height);
         PygameRsDev.surfaceResized(width, height);
     }
@@ -240,11 +209,60 @@ public class ScriptActivity extends Activity implements SurfaceHolder.Callback {
             return;
         }
         // 可靠收口：surface 销毁 = 本场运行必终。ANCO 的返回手势不触发
-        // onBackPressed（真机实证：无 stop 标志时引擎不收口 → 音频泄漏
-        // /换场异常）——这里补发 stop，detach 的 Close 双保险
+        // onBackPressed（真机实证：无 stop 标志时引擎不收口 → 音频泄漏）
         SdLog.log("surfaceDestroyed → stop + detach");
         PygameRsDev.stop();
         PygameRsDev.detachSurface(holder.getSurface());
+    }
+
+    // ── TextureView 路径（全屏）──────────────────────────────────
+    @Override
+    public void onSurfaceTextureAvailable(SurfaceTexture st, int width, int height) {
+        SdLog.log("textureAvailable " + width + "x" + height
+                + "（gen " + (activeGen + 1) + "）");
+        myGen = ++activeGen;
+        textureSurface = new Surface(st);
+        PygameRsDev.attachSurface(textureSurface);
+        loadOnce();
+    }
+
+    @Override
+    public void onSurfaceTextureSizeChanged(SurfaceTexture st, int width, int height) {
+        SdLog.log("textureSizeChanged " + width + "x" + height);
+        PygameRsDev.surfaceResized(width, height);
+    }
+
+    @Override
+    public boolean onSurfaceTextureDestroyed(SurfaceTexture st) {
+        if (myGen == activeGen) {
+            SdLog.log("textureDestroyed → stop + detach");
+            PygameRsDev.stop();
+            PygameRsDev.detachSurface(textureSurface);
+        } else {
+            SdLog.log("textureDestroyed 陈旧——忽略");
+        }
+        if (textureSurface != null) {
+            textureSurface.release();
+            textureSurface = null;
+        }
+        return true; // 允许释放 SurfaceTexture（detach 已对消引用）
+    }
+
+    @Override
+    public void onSurfaceTextureUpdated(SurfaceTexture st) {
+    }
+
+    // ── 共用：attach 后的一次性加载 ─────────────────────────────
+    private void loadOnce() {
+        if (loadSent) return;
+        loadSent = true;
+        String code = readAsset("scripts/" + scriptName);
+        if (code != null) {
+            SdLog.log("loadCode " + scriptName + "（" + code.length() + " B）");
+            PygameRsDev.loadCode(code);
+        } else {
+            SdLog.log("loadCode 失败：asset 缺失 " + scriptName);
+        }
     }
 
     @Override
@@ -256,16 +274,11 @@ public class ScriptActivity extends Activity implements SurfaceHolder.Callback {
         else if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) action = 2;
         else return false;
         // Activity 级坐标 = 全屏系——换算到 view 局部（脚本逻辑系）：
-        // 全屏等比 = 减居中原点 + 除缩放；非全屏 = 减 view 原点 + 除
-        // view 放大倍数（漏算 = egui/触摸整体错位，只有左上角可交互）
+        // 全屏 = 按铺满比例反算；非全屏 = 减 view 原点 + 除放大倍数
         float x = e.getX(), y = e.getY();
         if (fullscreen && root != null && root.getWidth() > 0) {
-            float s = Math.min(root.getWidth() / (float) logicalW,
-                               root.getHeight() / (float) logicalH);
-            float ox = (root.getWidth() - logicalW * s) / 2f;
-            float oy = (root.getHeight() - logicalH * s) / 2f;
-            x = (x - ox) / s;
-            y = (y - oy) / s;
+            x = x * logicalW / root.getWidth();
+            y = y * logicalH / root.getHeight();
         } else if (surfaceView != null) {
             x = (x - surfaceView.getX()) / viewScale;
             y = (y - surfaceView.getY()) / viewScale;
