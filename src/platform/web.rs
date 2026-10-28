@@ -202,6 +202,13 @@ fn start_fetch(url: String) {
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen(start)]
 pub async fn web_start() -> Result<(), wasm_bindgen::JsValue> {
+    // 单次闸门：web_start 在页面上会执行两次（wasm start 段自动执行 +
+    // glue init 的 __wbindgen_start 显式调用——真机日志"就绪"×2 实证）。
+    // body 幂等但双跑误诊，闸门归一
+    static STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if STARTED.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return Ok(());
+    }
     // panic 消息转发控制台（wasm32 panic=abort——默认只留 unreachable 陷阱）
     std::panic::set_hook(Box::new(|info| {
         console_log(&format!("[panic] {info}"));
@@ -223,6 +230,22 @@ pub fn load_code(code: String, args: Vec<String>) {
     }
     ARGS.with(|a| *a.borrow_mut() = args);
     start_code(code);
+}
+
+/// wasm 链接锚点（bin main 触碰用，零副作用——不调用任何函数）：
+/// wasm-ld `--gc-sections` 以 main 可达为根，bin 入口若不引用本模块，
+/// 全部 `#[wasm_bindgen]` 导出（web_start/load_code/start_script）连同
+/// 自定义段描述一起被裁——python.js 只剩 default/initSync，页面
+/// `import { load_code }` 静态导入链接错误，整页静默挂死（真机实测）。
+/// 函数指针物化 = 代码段保留；web_start 为 async，构造其 Future 即达
+/// 引用目的（不轮询无副作用）。
+#[cfg(target_arch = "wasm32")]
+pub fn link_anchors() {
+    std::hint::black_box((
+        load_code as fn(String, Vec<String>),
+        start_script as fn(String),
+    ));
+    std::hint::black_box(web_start());
 }
 
 /// 路径拉取运行（`python <路径>` 映射）：fetch 加载脚本。

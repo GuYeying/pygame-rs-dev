@@ -12,6 +12,12 @@ fn main() {
 }
 
 /// wasm bin 的 rustc 存根——真入口 = platform::web::web_start
-///（`#[wasm_bindgen(start)]`，platform/web.rs）
+///（`#[wasm_bindgen(start)]`，platform/web.rs）。存根**必须触碰** web
+/// 模块（link_anchors——零副作用引用）：wasm-ld --gc-sections 以 main
+/// 可达为根，空 main 会把全部 wasm_bindgen 导出连同 start 一起裁掉
+///（python.js 只剩 default/initSync，页面 load_code 链接错整页挂——
+/// 真机实测），见 platform::web::link_anchors 文档
 #[cfg(target_arch = "wasm32")]
-fn main() {}
+fn main() {
+    pygame_rs_dev::platform::web::link_anchors();
+}

@@ -28,8 +28,10 @@ WEB = ROOT / "web"
 TARGET_DIR = ROOT / "target" / "wasm32-unknown-unknown" / "release"
 LOCK = ROOT / "Cargo.lock"
 
-# 模板占位符 __BUILD_TS__ 由脚本替换（不用 str.format——JS/CSS 花括号免转义）
-INDEX_TEMPLATE = """<!DOCTYPE html>
+# 模板占位符 __BUILD_TS__ 由脚本替换（不用 str.format——JS/CSS 花括号免转义）。
+# r""" 原始串：模板内 JS 的 '\n'/正则 /\s+/ 须原样到达输出——普通串会被
+# Python 转义成真换行注入 JS，整段 module script SyntaxError（真机踩坑）
+INDEX_TEMPLATE = r"""<!DOCTYPE html>
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -138,16 +140,30 @@ const status = s => { statusEl.textContent = s; };
 pathInput.value = bootScript ?? 'main.py';
 argsInput.value = bootArgv.join(' ');
 
-let exports = null;      // wasm 导出（shim 句柄在 ensureInit 挂到全局）
+let exportsPromise = null; // init 单飞（缓存 Promise 本身！）
 let pageStarted = false; // 本页是否已运行过程序（进程一次契约）
-const ensureInit = async () => {
-  if (!exports) {
-    exports = await init();
-    window.__pygame_rs_dev = { load_code: (c, a) => load_code(c, a ?? []) }; // shim 版导出（init() 返回的裸 wasm 导出无字符串编组）
+// 缓存必须是 Promise：顶层点火与 boot 分支在同一 tick 内同步连调
+// ensureInit，缓存"结果"会让两次都看到空值 → 双 init() → 双 wasm
+// 实例共享同一份 glue 对象堆——槽位互踩，回调里 getObject 拿到
+// undefined（getBoundingClientRect TypeError / 任意 OOB，真机实测：
+// "web 宿主就绪"×2 即此症状）
+const ensureInit = () => {
+  if (!exportsPromise) {
+    // wasm 本体带版本参数：index.html/python.js 都随构建换 URL，唯独
+    // python_bg.wasm 恒名——浏览器启发式缓存会吃旧 wasm（宿主逻辑更新
+    // 不生效，真机实测"守卫无效"假象）
+    exportsPromise = init({ module_or_path: './python_bg.wasm?v=__BUILD_TS__' }).then((ex) => {
+      // shim 版导出（init() 返回的裸 wasm 导出无字符串编组）
+      window.__pygame_rs_dev = {
+        load_code: (c, a) => load_code(c, a ?? []),
+        start_script: (u) => start_script(u),
+      };
+      return ex;
+    });
   }
-  return exports;
+  return exportsPromise;
 };
-import init, { load_code } from './python.js?v=__BUILD_TS__';
+import init, { load_code, start_script } from './python.js?v=__BUILD_TS__';
 
 const currentArgs = () => argsInput.value.trim().split(/\s+/).filter(Boolean);
 
@@ -163,8 +179,12 @@ const runCode = async (code, label) => {
 runBtn.addEventListener('click', async () => {
   const p = pathInput.value.trim() || 'main.py';
   if (bootScript === p && !pageStarted) {
+    // 落在 ?script= 页面上的首次点击 = 本页还没真正分派过——补发
+    // start_script（web_start 只装配不分派，2026-10-26 定约——分派权
+    // 在页面 boot；此前此分支只改文案，载荷永不运行）
     await ensureInit();
     pageStarted = true;
+    __pygame_rs_dev.start_script(p);
     status('运行 ' + p);
     return;
   }
@@ -203,13 +223,15 @@ if (stashRaw !== null) {
   runCode(stashRaw.slice(cut + 1), stashRaw.slice(0, cut));
 }
 
-// ── 自动点火（零点击）：wasm 加载即初始化（load_code 通道随时可用）；
-// ?script= 载荷由 web_start 在 init 时分派；暂存载荷自动消费 ──────
+// ── 自动点火（零点击）：wasm 加载即初始化；?script= 载荷在本页 init
+// 就绪后经 start_script 分派（web_start 只装配不分派——分派权在页面
+// boot，2026-10-26 定约）；暂存载荷自动消费 ─────────────────────────
 ensureInit();
 if (bootScript) {
   status('运行 ' + bootScript + '…');
   ensureInit().then(() => {
     pageStarted = true;
+    __pygame_rs_dev.start_script(bootScript);
     status('运行 ' + bootScript);
   });
 } else {
