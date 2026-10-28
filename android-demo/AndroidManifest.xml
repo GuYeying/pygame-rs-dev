@@ -7,8 +7,8 @@
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="pygame.rsdev"
-    android:versionCode="1"
-    android:versionName="0.1.0">
+    android:versionCode="2"
+    android:versionName="0.2.0">
 
     <!-- minSdk 26：cpal AAudio 硬性下限 -->
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36" />

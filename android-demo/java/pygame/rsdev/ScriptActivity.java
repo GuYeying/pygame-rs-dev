@@ -94,8 +94,12 @@ public class ScriptActivity extends Activity implements SurfaceHolder.Callback {
         surfaceView = sv;
         sv.getHolder().addCallback(this);
         // buffer 钉死脚本逻辑尺寸（与 view 缩放/布局解耦——引擎表面、
-        // buffer、脚本坐标系三方恒 1:1）
-        sv.getHolder().setFixedSize(logicalW, logicalH);
+        // buffer、脚本坐标系三方恒 1:1）。全屏例外：不钉——buffer 跟随
+        // view（满屏），引擎表面由壳按外部窗口实测尺寸初始化，脚本
+        // set_mode 后 GLES 缩放铺满（既定满屏语义）
+        if (!fullscreen) {
+            sv.getHolder().setFixedSize(logicalW, logicalH);
+        }
         // view 自适应放大：逻辑尺寸的整数倍铺到屏幕上限（800×600 在
         // 高分屏上太小——用户可感知的"egui/画面放大"即来自此；整数倍
         // = 像素干净，触摸/view/buffer 仍 1:1）。倍率在布局完成后按
@@ -222,11 +226,10 @@ public class ScriptActivity extends Activity implements SurfaceHolder.Callback {
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        // buffer 已 setFixedSize 钉死——恒报逻辑尺寸（全屏拉伸时 view
-        // 尺寸 ≠ buffer，报 view 尺寸会让引擎表面错配）
-        SdLog.log("surfaceChanged view=" + width + "x" + height
-                + " → 引擎表面 " + logicalW + "x" + logicalH);
-        PygameRsDev.surfaceResized(logicalW, logicalH);
+        // 直报实际表面尺寸：窗口化 = setFixedSize 的逻辑尺寸；全屏 =
+        // view 尺寸（buffer 未钉，跟随 view 满屏）
+        SdLog.log("surfaceChanged " + width + "x" + height);
+        PygameRsDev.surfaceResized(width, height);
     }
 
     @Override

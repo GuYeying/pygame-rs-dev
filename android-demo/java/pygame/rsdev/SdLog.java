@@ -12,6 +12,8 @@ import java.util.Date;
  *  与 Rust 侧 dev_log.txt 并列（前者记 Java 生命周期/崩溃，后者记
  *  引擎阶段面包屑）。 */
 public final class SdLog {
+    /** 构建标签：ksys_log 首行即可验证真机在跑哪个包 */
+    public static final String BUILD = "v0.2.0-build2";
     private static File file;
     private static final SimpleDateFormat TS =
             new SimpleDateFormat("MM-dd HH:mm:ss.SSS");
@@ -38,6 +40,7 @@ public final class SdLog {
             file = new File(dir, "ksys_log.txt");
         }
         log("=== 进程启动 pid=" + android.os.Process.myPid()
+                + " build=" + BUILD
                 + " log=" + file.getAbsolutePath() + " ===");
     }
 

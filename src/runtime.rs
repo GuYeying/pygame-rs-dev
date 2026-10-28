@@ -83,7 +83,14 @@ pub async fn run<H: Host>(host: &H) -> i32 {
     // ── 建窗（可见；GPU/交换链装配承载于窗口期——百 ms 级）──
     let t_gpu = Stopwatch::now();
     log(&format!("[{name}] ③建窗+GPU装配开始（旗标 {host_flags:#b}）"));
-    if let Err(e) = display::set_mode_ex((800, 600), host_flags).await {
+    // 壳窗尺寸：Android 嵌入 = 外部窗口实测值（attach 时记录）——引擎
+    // 表面初始即满屏 1:1，脚本 set_mode 后由 GLES 缩放铺满（用户接受
+    // 语义）；桌面/web = 800×600 惯例
+    #[cfg(target_os = "android")]
+    let (win_w, win_h) = starfish_we::embedded::external_size().unwrap_or((800, 600));
+    #[cfg(not(target_os = "android"))]
+    let (win_w, win_h) = (800u32, 600u32);
+    if let Err(e) = display::set_mode_ex((win_w, win_h), host_flags).await {
         log(&format!("[{name}] set_mode 失败: {e}"));
         return 1;
     }
