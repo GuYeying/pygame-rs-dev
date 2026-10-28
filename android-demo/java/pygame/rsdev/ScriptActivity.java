@@ -66,6 +66,9 @@ public class ScriptActivity extends Activity
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        // 传统全屏窗口标志：ANCO 兼容层对窗口的缩放摆放可能只认
+        // WindowManager 级 FLAG（systemUi 沉浸版已设，双保险）
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         // 全屏铺满：cutout 区域也纳入（默认 view 避开挖孔），导航/状态
         // 栏沉浸隐藏
         if (android.os.Build.VERSION.SDK_INT >= 28) {
