@@ -130,15 +130,28 @@ def main():
             sys.exit(f"[FAIL] JNI 符号未导出: {sym}")
     print("[nm] JNI 符号面完整 ✓")
 
-    # 3) javac
+    # 3) javac（构建 ID 注入：SdLog.BUILD 占位符 → 构建时刻——ksys_log
+    #    首行即可判真机包新旧；"还是老样子"两次无法判定的教训）
     print("=== 3/7 javac ===")
+    build_id = "v0.2.0-" + __import__("time").strftime("%Y%m%d-%H%M%S")
     obj = WORK / "obj"
     if obj.is_dir():
         shutil.rmtree(obj)
     obj.mkdir(parents=True)
     java_srcs = list((DEMO / "java").rglob("*.java"))
+    staged = []
+    for s in java_srcs:
+        rel = s.relative_to(DEMO / "java")
+        staged_path = WORK / "java" / rel
+        staged_path.parent.mkdir(parents=True, exist_ok=True)
+        staged_path.write_text(
+            s.read_text(encoding="utf-8").replace("__BUILD_ID__", build_id),
+            encoding="utf-8",
+        )
+        staged.append(str(staged_path))
     sh(["javac", "--release", "11", "-classpath", str(jar), "-d", str(obj),
-        *[str(s) for s in java_srcs]])
+        *staged])
+    print(f"[OK] 构建ID = {build_id}（ksys_log 首行可查）")
 
     # 4) d8 → classes.dex
     print("=== 4/7 d8 ===")

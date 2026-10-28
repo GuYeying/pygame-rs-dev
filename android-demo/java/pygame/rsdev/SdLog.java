@@ -12,8 +12,10 @@ import java.util.Date;
  *  与 Rust 侧 dev_log.txt 并列（前者记 Java 生命周期/崩溃，后者记
  *  引擎阶段面包屑）。 */
 public final class SdLog {
-    /** 构建标签：ksys_log 首行即可验证真机在跑哪个包 */
-    public static final String BUILD = "v0.2.0-build2";
+    /** 构建标签：ksys_log 首行即可验证真机在跑哪个包。占位符
+     *  __BUILD_ID__ 由 build_native_demo.py 在 javac 前注入构建时刻
+     *  （每包唯一——手动常量从不更新，真机新旧包无法判定的教训） */
+    public static final String BUILD = "__BUILD_ID__";
     private static File file;
     private static final SimpleDateFormat TS =
             new SimpleDateFormat("MM-dd HH:mm:ss.SSS");
