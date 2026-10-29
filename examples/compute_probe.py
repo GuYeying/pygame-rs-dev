@@ -97,13 +97,13 @@ async def main():
                 p.set_pipeline(rpipe)
                 p.set_bind_group(0, rbind)
                 p.draw_mesh(mesh)
-        # 帧缓冲取证：全部会话绘制后、flip 前取样（此点 color_frame 必在）
+        pygame.display.flip()
+        # 帧缓冲取证：flip 后取样（读已呈现帧 = 屏幕真实内容）
         if frame in (30, 45, 60):
             print('[state]', pygame.render.screen_frame_state())
             samples = pygame.render.screen_probe()
             if samples:
                 print('[compute-probe] 帧缓冲样本', len(samples))
-        pygame.display.flip()
         frame += 1
         if frame == 90:
             print("[compute-probe] SUMMARY PASS（90 帧后仍稳定）")
