@@ -9,3 +9,7 @@ web/
 target/apk/
 *.apk
 jniLibs/
+
+# 交付产物不入库（2026-10-29：本地分发用，按需归档到他处）
+pygame-rs-dev-0.1.3-*.tar.gz
+pygame-rs-dev-0.1.3-*.zip

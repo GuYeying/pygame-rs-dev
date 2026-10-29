@@ -84,7 +84,7 @@ async def main():
                         flavor="2d", label="p_rpipe")
     cam = pygame.render.camera_ortho(800.0, 600.0)
 
-    pygame.render.set_fb_dump(True)  # 帧缓冲取证：30-35 帧 dump 落 dev_log
+    # pygame.render.set_fb_dump(True)  # 帧缓冲取证默认关（真机 resolve+回读开销大，2026-10-29 定案；需要时手开）
 
     # 零导入 LCG（嵌入构建无 random/math——纯算术伪随机）
     seed = 20261029

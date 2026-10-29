@@ -5513,6 +5513,7 @@ version = "0.9.58"
 dependencies = [
  "android-activity",
  "js-sys",
+ "libc",
  "objc2",
  "objc2-app-kit",
  "objc2-core-foundation",
