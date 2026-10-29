@@ -133,7 +133,7 @@ def main():
     # 3) javac（构建 ID 注入：SdLog.BUILD 占位符 → 构建时刻——ksys_log
     #    首行即可判真机包新旧；"还是老样子"两次无法判定的教训）
     print("=== 3/7 javac ===")
-    build_id = "v0.2.0-" + __import__("time").strftime("%Y%m%d-%H%M%S")
+    build_id = "v0.2.2-" + __import__("time").strftime("%Y%m%d-%H%M%S")
     obj = WORK / "obj"
     if obj.is_dir():
         shutil.rmtree(obj)
