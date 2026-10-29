@@ -193,6 +193,20 @@ egui、任何消费者看到的是同一套逻辑坐标（hit 与视觉天然一
 
 ---
 
+### 坑 8：顶点段 SSBO——卓易通（ANCO）黑屏，片元段普遍可用
+
+- **现象**：compute/storage 探针在 Nova 15（鸿蒙 + 卓易通）上纯黑，纯
+  Android 同版正常；storage 读取从顶点段挪到片元段后两机一致。
+- **根因**：GLES 的**顶点着色器阶段读 SSBO** 是移动生态兼容性洼地
+  （ES 3.1 规范允许，驱动实现参差——Mali/Adreno 旧驱动也常见静默返 0）；
+  卓易通的 GLES→鸿蒙图形栈转译层再叠加一层，顶点段 SSBO 基本不可用。
+- **实测矩阵**（Nova 15 + 卓易通）：compute 段 read_write ✓；片元段
+  read ✓；顶点段 read ✗（静默返 0 → 黑四色融进黑填充 = "黑屏"）。
+- **规则**："GPU 写 → 渲染读"需要跨过顶点段时，走 **compute 写
+  storage → copy_buffer 到 uniform → 顶点读 uniform**（uniform 顶点段
+  全设备支持）；片元段读 storage 普遍可用。参考实现：compute_probe.py
+  （粒子版采用 compute→copy→uniform 架构即为此因）。
+
 ## 四、调试工具与取证方法
 
 ### 4.1 引擎打点（dev_log.txt，`setLogDir` 落点）
