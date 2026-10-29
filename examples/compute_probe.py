@@ -97,6 +97,11 @@ async def main():
                 p.set_pipeline(rpipe)
                 p.set_bind_group(0, rbind)
                 p.draw_mesh(mesh)
+        if frame in (30, 45, 60):
+            # 帧缓冲取证（帧跳过时 color_frame 为 None → 多帧重试）
+            samples = pygame.render.screen_probe()
+            if samples:
+                print('[compute-probe] 帧缓冲样本', len(samples))
         pygame.display.flip()
         frame += 1
         if frame == 90:
