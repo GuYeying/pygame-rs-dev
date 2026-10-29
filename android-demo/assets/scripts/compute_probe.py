@@ -97,8 +97,8 @@ async def main():
                 p.set_pipeline(rpipe)
                 p.set_bind_group(0, rbind)
                 p.draw_mesh(mesh)
+        # 帧缓冲取证：全部会话绘制后、flip 前取样（此点 color_frame 必在）
         if frame in (30, 45, 60):
-            # 帧缓冲取证（帧跳过时 color_frame 为 None → 多帧重试）
             samples = pygame.render.screen_probe()
             if samples:
                 print('[compute-probe] 帧缓冲样本', len(samples))
