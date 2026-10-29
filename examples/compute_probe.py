@@ -99,6 +99,7 @@ async def main():
                 p.draw_mesh(mesh)
         # 帧缓冲取证：全部会话绘制后、flip 前取样（此点 color_frame 必在）
         if frame in (30, 45, 60):
+            print('[state]', pygame.render.screen_frame_state())
             samples = pygame.render.screen_probe()
             if samples:
                 print('[compute-probe] 帧缓冲样本', len(samples))
