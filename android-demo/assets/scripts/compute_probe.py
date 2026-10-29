@@ -67,6 +67,7 @@ async def main():
         1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0,
         -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0,
     ]
+    pygame.render.set_fb_dump(True)  # 帧缓冲取证：30-33 帧 dump 落 dev_log
     mesh = ac.mesh("pos3color4", verts, label="probe_mesh")
     storage = ac.buffer(64, usage="storage", label="probe_storage")
     cbind = ac.bind_group([(0, "storage_rw", storage)], label="probe_compute_bind")
@@ -105,6 +106,8 @@ async def main():
             if samples:
                 print('[compute-probe] 帧缓冲样本', len(samples))
         frame += 1
+        if frame == 35:
+            pygame.render.set_fb_dump(False)
         if frame == 90:
             print("[compute-probe] SUMMARY PASS（90 帧后仍稳定）")
         await pygame.next_frame()
