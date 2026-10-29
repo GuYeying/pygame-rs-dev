@@ -31,7 +31,7 @@ struct VIn {
 };
 struct VOut {
     @builtin(position) pos: vec4<f32>,
-    @location(0) color: vec4<f32>,
+    @location(0) slot: f32,
 };
 
 @vertex
@@ -39,13 +39,14 @@ fn vs_main(in: VIn, @builtin(vertex_index) vi: u32) -> VOut {
     var o: VOut;
     o.pos = vec4<f32>(in.pos, 1.0);  // 自管 NDC 直入（无相机参与）
     var slots = array<u32, 6>(0u, 1u, 2u, 0u, 2u, 3u);
-    o.color = colors.colors[slots[vi]];
+    o.slot = f32(slots[vi]);
     return o;
 }
 
 @fragment
 fn fs_main(in: VOut) -> @location(0) vec4<f32> {
-    return in.color;
+    // storage 读取在片元段（GLES 普遍支持；顶点段 SSBO 属设备相关）
+    return colors.colors[u32(in.slot)];
 }
 """
 
@@ -87,6 +88,7 @@ async def main():
                 return
         with screen.render() as t:
             t.fill((8, 8, 12))
+            t.rect((255, 0, 255), (1, 1, 798, 598), 2)  # 诊断：画布边界框
             with t.raw_compute() as p:
                 p.set_pipeline(cpipe)
                 p.set_bind_group(0, cbind)
