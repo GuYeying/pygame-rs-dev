@@ -115,10 +115,14 @@ for (const m of ['log', 'info', 'warn', 'error']) {
 }
 window.addEventListener('error', e => {
   _wl.textContent += '[onerror] ' + (e.message || e.error) +
-    (e.filename ? ' @ ' + e.filename + ':' + e.lineno : '') + '\n';
+    (e.filename ? ' @ ' + e.filename + ':' + e.lineno : '') + '\n' +
+    ((e.error && e.error.stack)
+      ? String(e.error.stack).split('\n').slice(0, 12).join('\n') + '\n' : '');
 });
 window.addEventListener('unhandledrejection', e => {
-  _wl.textContent += '[rejection] ' + e.reason + '\n';
+  const r = e.reason;
+  const stack = (r && r.stack) ? String(r.stack).split('\n').slice(0, 12).join('\n') : '';
+  _wl.textContent += '[rejection] ' + r + '\n' + stack + '\n';
 });
 
 // ── 控制面板 ─────────────────────────────────────────────────
