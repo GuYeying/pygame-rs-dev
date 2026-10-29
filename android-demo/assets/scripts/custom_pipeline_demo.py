@@ -45,10 +45,6 @@ fn fs_main(in: VOut) -> @location(0) vec4<f32> {
     let ring = 0.5 + 0.5 * sin(d * 0.13 - u_time * 5.0);
     let glow = 1.0 - smoothstep(0.0, r, d) * 0.55;
     let col = mix(vec3<f32>(0.05, 0.1, 0.35), vec3<f32>(0.15, 0.95, 1.0), ring) * glow;
-    // 诊断探针：绿 = GPU 实际读到的相机平移 tx（合成 -0.6 -> 0.4 绿；
-    // 恒等 -1 -> 0 绿），红 = 波纹原始色占 0.8
-    let probe_r = clamp(camera.mvp[3].x + 1.0, 0.0, 1.0);
-    let col = vec3<f32>(probe_r * 0.4 + 0.05, 0.5 + probe_r * 0.2, 0.2);
     return vec4<f32>(col, edge);
 }
 """
